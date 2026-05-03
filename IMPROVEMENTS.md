@@ -18,8 +18,8 @@ This document catalogues targeted improvements to the existing codebase, focused
    - ✅ 2.2 [Large Numbers Have No Thousands Separator](#22-large-numbers-have-no-thousands-separator)  
    - ✅ 2.3 [Default Animation Speed is the Slowest Setting](#23-default-animation-speed-is-the-slowest-setting)  
    - 2.4 [Placeholder Joker Names in Stub Entries](#24-placeholder-joker-names-in-stub-entries)  
-   - 2.5 [Some UI Labels Use Small Font Where Big Font Fits](#25-some-ui-labels-use-small-font-where-big-font-fits)  
-   - 2.6 [Formatted-Text Centering Traverses String Twice](#26-formatted-text-centering-traverses-string-twice)
+   - ✅ 2.5 [Some UI Labels Use Small Font Where Big Font Fits](#25-some-ui-labels-use-small-font-where-big-font-fits)  
+   - ✅ 2.6 [Formatted-Text Centering Traverses String Twice](#26-formatted-text-centering-traverses-string-twice)
 3. [Code Quality / Hygiene](#3-code-quality--hygiene)
    - 3.1 [MAX_QUADS Inconsistency with Vertex Array Size](#31-max_quads-inconsistency-with-vertex-array-size)
 4. [Summary Table](#4-summary-table)
@@ -257,7 +257,7 @@ If a player somehow encounters one of these (e.g. via a stub shop slot), the too
 
 ---
 
-### 2.5 Some UI Labels Use Small Font Where Big Font Fits
+### ✅ 2.5 Some UI Labels Use Small Font Where Big Font Fits
 
 **File:** `src/draw.c`  
 **Priority:** Low | **Difficulty:** Low  
@@ -275,7 +275,7 @@ Hint text and secondary labels are appropriately sized at `font_small` size 1.
 
 ---
 
-### 2.6 Formatted-Text Centering Traverses String Twice
+### ✅ 2.6 Formatted-Text Centering Traverses String Twice
 
 **File:** `src/graphics.c` (`graphics_draw_text_formatted_center`)  
 **Priority:** Low | **Difficulty:** Low  
