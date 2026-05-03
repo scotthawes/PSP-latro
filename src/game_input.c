@@ -1028,8 +1028,46 @@ void game_input_update_run_info_close(bool no_input)
     }
 }
 
+/* §2.1 Analog stick → synthetic D-pad injection.
+ * Lx/Ly: 0–255, centre 128.  Threshold ±64 from centre.
+ * First fire is immediate; subsequent fires repeat every ANALOG_REPEAT frames
+ * after an initial hold delay of ANALOG_INITIAL frames (~333 ms initial, ~133 ms repeat).
+ * Only injects when the physical D-pad button is not already pressed so the two
+ * input sources never double-fire on the same frame. */
+#define ANALOG_DEADZONE       64
+#define ANALOG_INITIAL_FRAMES 20
+#define ANALOG_REPEAT_FRAMES   8
+
+static int s_al = 0, s_ar = 0, s_au = 0, s_ad = 0; /* per-direction repeat timers */
+
+static void analog_inject(unsigned int button, bool deflected, int *timer)
+{
+    if (!deflected) { *timer = 0; return; }
+    bool fire = (*timer == 0) ||
+                (*timer > ANALOG_INITIAL_FRAMES &&
+                 (*timer - ANALOG_INITIAL_FRAMES) % ANALOG_REPEAT_FRAMES == 0);
+    if (fire && !(g_pad.Buttons & button))
+    {
+        g_pad.Buttons      |=  button;
+        g_last_pad.Buttons &= ~button;
+    }
+    (*timer)++;
+}
+
 void game_input_update(bool no_input)
 {
+    if (!no_input)
+    {
+        analog_inject(PSP_CTRL_LEFT,  g_pad.Lx < 128 - ANALOG_DEADZONE, &s_al);
+        analog_inject(PSP_CTRL_RIGHT, g_pad.Lx > 128 + ANALOG_DEADZONE, &s_ar);
+        analog_inject(PSP_CTRL_UP,    g_pad.Ly < 128 - ANALOG_DEADZONE, &s_au);
+        analog_inject(PSP_CTRL_DOWN,  g_pad.Ly > 128 + ANALOG_DEADZONE, &s_ad);
+    }
+    else
+    {
+        s_al = s_ar = s_au = s_ad = 0;
+    }
+
     switch(g_game_state.input_focused_zone)
     {
         case INPUT_FOCUSED_ZONE_HAND:
