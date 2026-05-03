@@ -895,7 +895,7 @@ void graphics_draw_rotated_quad(float x, float y, float w, float h, int16_t u, i
     g_quad_vertices[index+3].u = u;         g_quad_vertices[index+3].v = v + vh;
     g_quad_vertices[index+3].color = color;
 
-        sceKernelDcacheWritebackRange(g_quad_vertices, sizeof(struct Vertex) * 4);
+    sceKernelDcacheWritebackRange(g_quad_vertices, sizeof(struct Vertex) * 4);
     sceGumDrawArray(GU_TRIANGLE_FAN, GU_COLOR_8888|GU_TEXTURE_16BIT|GU_VERTEX_32BITF|GU_TRANSFORM_3D, 4, NULL, g_quad_vertices);
     g_current_quad += 2;
     DEBUG_PRINTF("Draw Fan Triangle\n");
