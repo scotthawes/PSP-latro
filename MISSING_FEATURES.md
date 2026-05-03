@@ -221,7 +221,15 @@ The original has 8 Stakes (White through Gold) that increase difficulty with mod
 
 ---
 
-## 8. Save & Unlock Progression
+## 8. Seeded Runs
+
+The original supports entering a custom alphanumeric seed before starting a run, producing a fully reproducible game (same card draws, shop offerings, boss blinds). This is toggled via the Run Setup screen with `G.FUNCS.toggle_seeded_run`. Non-seeded runs use a randomly generated seed displayed at run start.
+
+PSP-latro calls `srand(time(0))` at startup and has no seed entry, no run setup screen, and no way to reproduce a run. The seed is never shown to the player.
+
+---
+
+## 9. Save & Unlock Progression
 
 The original tracks a persistent profile across runs, storing:
 - Joker/card discovery progress
@@ -233,7 +241,7 @@ PSP-latro has no save system. `settings.ini` only stores gameplay configuration;
 
 ---
 
-## 9. Partially Implemented Jokers
+## 10. Partially Implemented Jokers
 
 Approximately 55 jokers are defined in `src/game.c` but marked `// NOT IMPLEMENTED` — they appear in the pool with placeholder names (`"name"`) and descriptions (`"test"`), and their scoring logic in the callbacks is absent or stubbed. These jokers can appear in shops but have no effect.
 
@@ -301,7 +309,7 @@ Approximately 55 jokers are defined in `src/game.c` but marked `// NOT IMPLEMENT
 
 ---
 
-## 10. Joker Name Typo
+## 11. Joker Name Typo
 
 `JOKER_TYPE_PARKEO` in `src/global.h` should be `JOKER_TYPE_PERKEO` to match the original joker name "Perkeo" (`j_perkeo`). This is a cosmetic issue and does not affect gameplay logic, but should be corrected for consistency.
 
@@ -313,7 +321,7 @@ Approximately 55 jokers are defined in `src/game.c` but marked `// NOT IMPLEMENT
 |---|---|
 | Jokers (150 defined) | ⚠️ ~95 implemented, ~55 stubbed (`// NOT IMPLEMENTED`) |
 | Tarot cards (22) | ✅ Complete |
-| Planet cards (11) | ✅ Complete |
+| Planet cards (12) | ✅ Complete |
 | Card editions (Foil/Holo/Poly/Negative) | ✅ Complete |
 | Card enhancements | ✅ Complete |
 | Card seals | ✅ Complete |
@@ -327,4 +335,5 @@ Approximately 55 jokers are defined in `src/game.c` but marked `// NOT IMPLEMENT
 | Tags system (24 tags) | ❌ Not implemented |
 | Stake / difficulty system (8 stakes) | ❌ Not implemented |
 | Save & unlock progression | ❌ Not implemented |
+| Seeded runs | ❌ Not implemented |
 | Joker name typo (PARKEO → PERKEO) | ⚠️ Cosmetic fix needed |
