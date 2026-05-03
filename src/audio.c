@@ -209,7 +209,7 @@ int audio_load_ogg(char *filename)
     FILE *fp_ogg = fopen(filename, "rb");
     if (fp_ogg == NULL)
     {
-        DEBUG_PRINTF("audio_load_ogg: could not open \"% s\"\n", filename);
+        DEBUG_PRINTF("audio_load_ogg: could not open \"%s\"\n", filename);
         return -1;
     }
     fseek(fp_ogg, 0, SEEK_END);
@@ -230,7 +230,16 @@ int audio_load_ogg(char *filename)
     callbacks.close_func = audio_ogg_callback_close_ogg;
     callbacks.tell_func = audio_ogg_callback_tell_ogg;
 
-    ov_open_callbacks((void *)&(g_ogg_files[0]), &(g_ogg_files[0].vorbis_file), NULL, -1, callbacks);
+    if (ov_open_callbacks((void *)&(g_ogg_files[0]), &(g_ogg_files[0].vorbis_file), NULL, -1, callbacks) != 0)
+    {
+        DEBUG_PRINTF("audio_load_ogg: ov_open_callbacks failed for \"%s\"\n", filename);
+        free(g_ogg_files[0].file_ptr);
+        g_ogg_files[0].file_ptr = NULL;
+        g_ogg_files[0].cur_ptr = NULL;
+        g_ogg_files[0].file_size = 0;
+        g_ogg_files[0].in_use = false;
+        return -1;
+    }
 
 #ifdef DEBUG    
     {
@@ -255,6 +264,14 @@ int audio_load_ogg_from_archive(char *filename)
 {
     size_t file_size = 0;
     g_ogg_files[0].file_ptr = (char *)archive_load_file_entry(filename, &file_size);
+    if (g_ogg_files[0].file_ptr == NULL || file_size == 0)
+    {
+        DEBUG_PRINTF("audio_load_ogg_from_archive: missing file \"%s\" in archive\n", filename);
+        g_ogg_files[0].cur_ptr = NULL;
+        g_ogg_files[0].file_size = 0;
+        g_ogg_files[0].in_use = false;
+        return -1;
+    }
 
     ov_callbacks callbacks;
     
@@ -267,7 +284,16 @@ int audio_load_ogg_from_archive(char *filename)
     callbacks.close_func = audio_ogg_callback_close_ogg;
     callbacks.tell_func = audio_ogg_callback_tell_ogg;
 
-    ov_open_callbacks((void *)&(g_ogg_files[0]), &(g_ogg_files[0].vorbis_file), NULL, -1, callbacks);
+    if (ov_open_callbacks((void *)&(g_ogg_files[0]), &(g_ogg_files[0].vorbis_file), NULL, -1, callbacks) != 0)
+    {
+        DEBUG_PRINTF("audio_load_ogg_from_archive: ov_open_callbacks failed for \"%s\"\n", filename);
+        free(g_ogg_files[0].file_ptr);
+        g_ogg_files[0].file_ptr = NULL;
+        g_ogg_files[0].cur_ptr = NULL;
+        g_ogg_files[0].file_size = 0;
+        g_ogg_files[0].in_use = false;
+        return -1;
+    }
 
 #ifdef DEBUG    
     {
