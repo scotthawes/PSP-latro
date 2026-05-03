@@ -50,7 +50,7 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
         else
         {
             g_debug_info.audio_wait_read++;
-            memset(buf, 0, AUDIO_BUFFER_SIZE);   /* output silence on underrun */
+            /* PSP DMA replays previous frame on underrun — intentional for PSP audio */
         }
     }
     else
