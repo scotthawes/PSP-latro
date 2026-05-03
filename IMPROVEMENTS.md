@@ -7,10 +7,10 @@ This document catalogues targeted improvements to the existing codebase, focused
 ## Table of Contents
 
 1. [Performance Improvements](#1-performance-improvements)
-   - 1.1 [Replace Full Dcache Flush in Hot-Path Draw Macro](#11-replace-full-dcache-flush-in-hot-path-draw-macro)  
-   - 1.2 [Increase MAX_QUADS to Reduce Flush Frequency](#12-increase-max_quads-to-reduce-flush-frequency)  
-   - 1.3 [Enable 333 MHz Overclock by Default](#13-enable-333-mhz-overclock-by-default)  
-   - 1.4 [Scoped Dcache Flush for Rotated Quads](#14-scoped-dcache-flush-for-rotated-quads)  
+   - ✅ 1.1 [Replace Full Dcache Flush in Hot-Path Draw Macro](#11-replace-full-dcache-flush-in-hot-path-draw-macro)  
+   - ✅ 1.2 [Increase MAX_QUADS to Reduce Flush Frequency](#12-increase-max_quads-to-reduce-flush-frequency)  
+   - ✅ 1.3 [Enable 333 MHz Overclock by Default](#13-enable-333-mhz-overclock-by-default)  
+   - ✅ 1.4 [Scoped Dcache Flush for Rotated Quads](#14-scoped-dcache-flush-for-rotated-quads)  
    - 1.5 [Redundant Dcache Flush at End of Frame](#15-redundant-dcache-flush-at-end-of-frame)  
    - 1.6 [Audio Decoding Runs on the Main Thread](#16-audio-decoding-runs-on-the-main-thread)
 2. [UI Improvements](#2-ui-improvements)
@@ -28,7 +28,7 @@ This document catalogues targeted improvements to the existing codebase, focused
 
 ## 1. Performance Improvements
 
-### 1.1 Replace Full Dcache Flush in Hot-Path Draw Macro
+### ✅ 1.1 Replace Full Dcache Flush in Hot-Path Draw Macro
 
 **File:** `src/graphics.c`, line 58  
 **Priority:** High | **Difficulty:** Low  
@@ -57,7 +57,7 @@ This document catalogues targeted improvements to the existing codebase, focused
 
 ---
 
-### 1.2 Increase MAX_QUADS to Reduce Flush Frequency
+### ✅ 1.2 Increase MAX_QUADS to Reduce Flush Frequency
 
 **File:** `src/graphics.c`, line 60  
 **Priority:** Medium | **Difficulty:** Low  
@@ -79,7 +79,7 @@ Pair this with the range-scoped flush fix in §1.1 so that each flush of 500 qua
 
 ---
 
-### 1.3 Enable 333 MHz Overclock by Default
+### ✅ 1.3 Enable 333 MHz Overclock by Default
 
 **File:** `assets/settings.ini`  
 **Priority:** High | **Difficulty:** Trivial  
@@ -106,7 +106,7 @@ overclock=true
 
 ---
 
-### 1.4 Scoped Dcache Flush for Rotated Quads
+### ✅ 1.4 Scoped Dcache Flush for Rotated Quads
 
 **File:** `src/graphics.c` (`graphics_draw_rotated_quad`)  
 **Priority:** Medium | **Difficulty:** Low  
