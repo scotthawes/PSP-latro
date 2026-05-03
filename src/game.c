@@ -1484,7 +1484,8 @@ bool game_init_load_file_values()
             {
                 token_type = ini_read_token(buffer, 128);
                 if (token_type != INI_TOKEN_VALUE) return false;
-                strcpy(g_settings.archive_file_name, buffer);
+                strncpy(g_settings.archive_file_name, buffer, 127);
+                g_settings.archive_file_name[127] = '\0';
             }
             else if (!strcmp(buffer, "hand_size"))
             {

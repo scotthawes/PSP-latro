@@ -50,6 +50,7 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
         else
         {
             g_debug_info.audio_wait_read++;
+            memset(buf, 0, AUDIO_BUFFER_SIZE);   /* output silence on underrun */
         }
     }
     else
@@ -73,7 +74,7 @@ struct sample_t
 {
     short l, r;
 };
-char temp_buffer[AUDIO_BUFFER_SIZE];
+static char temp_buffer[AUDIO_BUFFER_SIZE];
 
 void audio_update()
 {
@@ -101,23 +102,9 @@ void audio_update()
 
         int size = (AUDIO_BUFFER_SIZE / 4);
 
-        int index/*, index2*/ = 0;
+        int index = 0;
         for (int i = 0; i < size; i++)
         {
-            // index = floor(i_src);
-            // index2 = index + 1;
-            // if (index2 >= size)
-            // {
-            //     dst[i].l = src[index].l;
-            //     dst[i].r = src[index].r;
-            // }
-            // else
-            // {
-            //     float f = i_src - (float)index;
-            //     dst[i].l = src[index].l * (1.0f - f) + src[index2].l * f;
-            //     dst[i].r = src[index].r * (1.0f - f) + src[index2].r * f;
-            // }
-
             index = roundf(i_src);
             dst[i].l = src[index].l;
             dst[i].r = src[index].r;
@@ -220,6 +207,11 @@ long audio_ogg_callback_tell_ogg( void *fh )
 int audio_load_ogg(char *filename)
 {
     FILE *fp_ogg = fopen(filename, "rb");
+    if (fp_ogg == NULL)
+    {
+        DEBUG_PRINTF("audio_load_ogg: could not open \"% s\"\n", filename);
+        return -1;
+    }
     fseek(fp_ogg, 0, SEEK_END);
     long fsize = ftell(fp_ogg);
     fseek(fp_ogg, 0, SEEK_SET);

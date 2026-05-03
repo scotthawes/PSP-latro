@@ -1044,8 +1044,8 @@ bool game_util_has_room_in_consumables()
 
 bool game_util_has_room_in_jokers()
 {
-    // TODO: Account for negative jokers
-    return g_game_state.jokers.joker_count < g_game_state.joker_slots;
+    int effective_slots = g_game_state.joker_slots + g_game_state.jokers.negative_count;
+    return g_game_state.jokers.joker_count < effective_slots;
 }
 
 int game_util_get_card_original_chips(struct Card *card)

@@ -403,7 +403,7 @@ void game_draw_booster_hint(struct BoosterPack *booster)
     }
 }
 
-bool g_freeze_cards = false;
+static bool g_freeze_cards = false;
 
 float sin_table[256] = {
  0.0000000f,  0.0245412f,  0.0490677f,  0.0735646f,  0.0980171f,  0.1224107f,  0.1467305f,  0.1709619f,

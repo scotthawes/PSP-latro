@@ -33,6 +33,7 @@ struct Texture
     int height;
     uint8_t *data;
     int format;
+    int bytes_per_pixel;
 };
 
 struct Font
@@ -554,6 +555,7 @@ int graphics_load_texture_from_image(struct Image *loaded_image, int start_x, in
     g_textures[texture_slot].height = desired_height;
     g_textures[texture_slot].data = image_swizzled;
     g_textures[texture_slot].format = GU_PSM_8888;
+    g_textures[texture_slot].bytes_per_pixel = 4;
     sceKernelDcacheWritebackInvalidateAll();
 
     g_texture_count++;
@@ -646,6 +648,7 @@ int graphics_load_texture_from_image_16bit(struct Image *loaded_image, int start
     g_textures[texture_slot].height = desired_height;
     g_textures[texture_slot].data = image_swizzled;
     g_textures[texture_slot].format = GU_PSM_4444;
+    g_textures[texture_slot].bytes_per_pixel = 2;
     sceKernelDcacheWritebackInvalidateAll();
 
     g_texture_count++;
@@ -774,7 +777,7 @@ void graphics_destroy_texture(int texture)
     g_textures[texture].in_use = false;
     g_texture_count--;
 
-    g_allocated_graphic_bytes -= g_textures[texture].width * g_textures[texture].height * 4;
+    g_allocated_graphic_bytes -= g_textures[texture].width * g_textures[texture].height * g_textures[texture].bytes_per_pixel;
     DEBUG_PRINTF("Allocated graphics: %d\n", g_allocated_graphic_bytes);
 }
 

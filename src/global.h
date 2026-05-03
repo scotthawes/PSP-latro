@@ -1099,8 +1099,6 @@ void graphics_set_offscreen_render_target();
 void graphics_unset_offscreen_render_target();
 void graphics_flush_quads();
 
-extern bool g_freeze_cards;
-
 #define INPUT_BUTTON_LEFT           PSP_CTRL_LEFT
 #define INPUT_BUTTON_RIGHT          PSP_CTRL_RIGHT
 #define INPUT_BUTTON_UP             PSP_CTRL_UP
