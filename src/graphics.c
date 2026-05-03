@@ -54,7 +54,7 @@ int g_font_count = 0;
 int g_allocated_graphic_bytes = 0;
 
 #define GU_START()   sceGuStart(GU_DIRECT, g_draw_list); g_vertex_array_pos = 0; g_quad_vertices = g_vertex_array; // printf("GU_START\n");
-#define GU_FINISH()  sceKernelDcacheWritebackAll(); sceGuFinish(); sceGuSync(0,0); // printf("GU_FINISH\n");
+#define GU_FINISH()  sceGuFinish(); sceGuSync(0,0); // printf("GU_FINISH\n");
 #define GU_DRAW_ARRAY_QUADS()   sceKernelDcacheWritebackRange(g_quad_vertices, sizeof(struct Vertex) * 2 * g_current_quad); sceGumDrawArray(GU_SPRITES, GU_COLOR_8888|GU_TEXTURE_16BIT|GU_VERTEX_32BITF|GU_TRANSFORM_3D, 2 * g_current_quad, NULL, g_quad_vertices); // printf("GU_DRAW_ARRAY_QUADS: %d %d\n", g_current_quad, g_vertex_array_pos);
 // #define GU_ALLOC_QUAD_ARRAY()   g_current_quad = 0; g_quad_vertices = (struct Vertex*)sceGuGetMemory(MAX_QUADS * 2 * sizeof(struct Vertex)); // printf("GU_ALLOC_QUAD_ARRAY: %p %p %p %p %p %p\n", g_quad_vertices, (void *)g_draw_list, sceGeEdramGetAddr(), sceGeEdramGetAddr() + (int)g_frame_buffer_0, sceGeEdramGetAddr() + (int)g_frame_buffer_1, sceGeEdramGetAddr() + (int)g_frame_buffer_2);
 #define GU_ALLOC_QUAD_ARRAY()   g_vertex_array_pos += g_current_quad * 2; g_quad_vertices = &(g_vertex_array[g_vertex_array_pos]); g_current_quad = 0; // printf("GU_ALLOC_QUAD_ARRAY %d\n", g_vertex_array_pos);
