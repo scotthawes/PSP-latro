@@ -1026,7 +1026,7 @@ void game_draw_left_info()
             graphics_draw_text(font_small, "Score at least", 6, y, 1.0f, COLOR_WHITE);
             y += 8;
             fmt_num(str, game_get_current_blind_score());
-            graphics_draw_text(font_small, str, 6, y, 1.0f, COLOR_WHITE);
+            graphics_draw_text(font_big, str, 6, y, 1.0f, COLOR_WHITE);
             y += 24;            
 
             break;
@@ -1133,9 +1133,9 @@ void game_draw_left_info()
     graphics_draw_quad((DRAW_LEFT_INFO_WIDTH / 2.0f) + 4, y - 2, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8, 11, 0, 0, 0, 0, COLOR_DARK_GREY);
 
     sprintf(str, "#5%d#-/8", g_game_state.ante);
-    graphics_draw_text_formatted_center(font_small, str, NULL, 2.0f + DRAW_LEFT_INFO_WIDTH / 4.0f, y + 4, 1.0f, COLOR_WHITE);
+    graphics_draw_text_formatted_center(font_big, str, NULL, 2.0f + DRAW_LEFT_INFO_WIDTH / 4.0f, y + 4, 1.0f, COLOR_WHITE);
     sprintf(str, "%d", g_game_state.round);
-    graphics_draw_text_center(font_small, str, 3.0f * (DRAW_LEFT_INFO_WIDTH / 4.0f), y + 4, 1.0f, COLOR_TEXT_ORANGE);
+    graphics_draw_text_center(font_big, str, 3.0f * (DRAW_LEFT_INFO_WIDTH / 4.0f), y + 4, 1.0f, COLOR_TEXT_ORANGE);
     
     y += 20;
     if (g_game_state.input_focused_zone == INPUT_FOCUSED_ZONE_RUN_INFO)

@@ -1014,7 +1014,31 @@ int graphics_get_formatted_text_length(const char *text, void *item)
 
 void graphics_draw_text_formatted_center(int font, const char *text, void *item, float x, float y, float size, uint32_t color)
 {
-    int length = graphics_get_formatted_text_length(text, item);
+    /* Inline measure pass — avoids a separate function call and resolves #j/#t tokens only once here. */
+    int count = 0;
+    int length = 0;
+    unsigned char c = text[0];
+    while (c != 0)
+    {
+        if (c == '#')
+        {
+            c = text[++count];
+            if (c == 0) break;
+            if (c == 'j' || c == 't')
+            {
+                char tmp[32];
+                if (c == 'j') game_util_get_joker_hint_value((struct Joker*)item, tmp);
+                else           game_util_get_tarot_hint_value((struct Tarot*)item, tmp);
+                int i = 0;
+                while (tmp[i]) { length++; i++; }
+            }
+        }
+        else
+        {
+            length++;
+        }
+        c = text[++count];
+    }
     graphics_draw_text_formatted(font, text, item, x - ((float)length / 2.0f * g_fonts[font].width * size), y - (g_fonts[font].height * size / 2.0f), size, color);
 }
 
