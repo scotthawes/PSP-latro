@@ -1,5 +1,28 @@
 #include "global.h"
 
+/* Format a non-negative double as an integer with thousands commas.
+ * Falls back to %g for values >= 1e15 (scores that need scientific notation). */
+static void fmt_num(char *buf, double n)
+{
+    if (n < 0.0 || n >= 1e15) { sprintf(buf, "%g", n); return; }
+    long long v = (long long)n;
+    char tmp[24];
+    char *p = tmp + sizeof(tmp) - 1;
+    *p = '\0';
+    int group = 0;
+    long long rem = v;
+    if (rem == 0) { buf[0] = '0'; buf[1] = '\0'; return; }
+    while (rem > 0) {
+        if (group > 0 && group % 3 == 0) *--p = ',';
+        *--p = '0' + (int)(rem % 10);
+        rem /= 10;
+        group++;
+    }
+    int i = 0;
+    while (*p) buf[i++] = *p++;
+    buf[i] = '\0';
+}
+
 #define TEXTURE_CARD_WIDTH  69
 #define TEXTURE_CARD_HEIGHT 93
 
@@ -1002,7 +1025,7 @@ void game_draw_left_info()
             y += 12;
             graphics_draw_text(font_small, "Score at least", 6, y, 1.0f, COLOR_WHITE);
             y += 8;
-            sprintf(str, "%g", game_get_current_blind_score());
+            fmt_num(str, game_get_current_blind_score());
             graphics_draw_text(font_small, str, 6, y, 1.0f, COLOR_WHITE);
             y += 24;            
 
@@ -1034,7 +1057,7 @@ void game_draw_left_info()
     graphics_set_no_texture();
     graphics_draw_quad(6, y, 88, 12, 0, 0, 0, 0, 0xFF666666);
     y += 2;
-    sprintf(str, "%g", g_game_state.score);
+    fmt_num(str, g_game_state.score);
     graphics_draw_text_center(font_big, str, 2.0f + (DRAW_LEFT_INFO_WIDTH / 2.0f), y + 4, 1.0f, COLOR_WHITE);
 
 
@@ -1067,11 +1090,11 @@ void game_draw_left_info()
     }    
 
     y += 2;
-    sprintf(str, "%ld", g_game_state.current_base_chips);
+    fmt_num(str, (double)g_game_state.current_base_chips);
     graphics_draw_text_center(font_small, str, DRAW_LEFT_INFO_WIDTH / 4.0f, y + 4.0f, 1.0f, COLOR_WHITE);
     sprintf(str, "x");
     graphics_draw_text(font_small, str, 47, y, 1.0f, 0xFF8888FF);
-    sprintf(str, "%ld", g_game_state.current_base_mult);
+    fmt_num(str, (double)g_game_state.current_base_mult);
     graphics_draw_text_center(font_small, str, 2.0f + 3.0f * (DRAW_LEFT_INFO_WIDTH / 4.0f), y + 4.0f, 1.0f, COLOR_WHITE);
 
     y += 22;
@@ -1373,7 +1396,7 @@ void game_draw_end_game_info(const char *title, int color)
     graphics_draw_solid_quad(x + 6.0f, y - 6.0f, END_GAME_WIDTH - 12.0f, 20.0f, COLOR_DARK_GREY_2);
     graphics_draw_solid_quad(x + (END_GAME_WIDTH / 2.0f), y - 2.0f, (END_GAME_WIDTH / 2.0f) - 14.0f, 12.0f, COLOR_DARK_GREY);
     graphics_draw_text_center(font_small, "Best Hand", x + 58.0f, y + 4.0f, 1.0f, COLOR_WHITE);
-    sprintf(str, "%g", g_game_state.stats.max_score);
+    fmt_num(str, g_game_state.stats.max_score);
     graphics_draw_text_center(font_small, str, x + (END_GAME_WIDTH / 2.0f) + 54.0f, y + 4.0f, 1.0f, COLOR_WHITE);
     y += 22.0f;
     graphics_draw_solid_quad(x + 6.0f, y - 6.0f, END_GAME_WIDTH - 12.0f, 20.0f, COLOR_DARK_GREY_2);
@@ -1486,7 +1509,7 @@ void game_draw_blind_select()
         graphics_draw_text(font_small, "Score at least", x + 2, y, 1.0f, COLOR_WHITE);
 
         y += 10;
-        sprintf(str, "%g", game_get_ante_base_score() * (1.0 + ((double)i * 0.5)));
+        fmt_num(str, game_get_ante_base_score() * (1.0 + ((double)i * 0.5)));
         graphics_draw_text(font_small, str, x + 2, y, 1.0f, COLOR_LIGHT_RED);
 
         if (i != g_game_state.blind)
