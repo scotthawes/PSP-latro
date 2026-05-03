@@ -16,10 +16,11 @@ void *g_frame_buffer_2;
 
 void *g_last_frame_buffer;
 
-#define MAX_QUADS 500
+#define QUAD_FLUSH_THRESHOLD  500
+#define QUAD_ARRAY_CAPACITY   2000
 
 static unsigned int __attribute__((aligned(16))) g_draw_list[262144];
-static struct Vertex __attribute__((aligned(16))) g_vertex_array[2000 * 2];
+static struct Vertex __attribute__((aligned(16))) g_vertex_array[QUAD_ARRAY_CAPACITY * 2];
 static int g_vertex_array_pos = 0;
 
 struct Vertex *g_quad_vertices;
@@ -938,7 +939,7 @@ void graphics_draw_quad(float x, float y, float w, float h, int16_t u, int16_t v
     g_quad_vertices[index+1].color = color;
 
     g_current_quad++;
-    if (g_current_quad >= MAX_QUADS)
+    if (g_current_quad >= QUAD_FLUSH_THRESHOLD)
     {
         graphics_flush_quads();
     }
