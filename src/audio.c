@@ -134,8 +134,35 @@ void audio_update()
     }
 }
 
+static SceUID s_audio_thread_id = -1;
+
+static int audio_thread_func(SceSize args, void *argp)
+{
+    while (1)
+    {
+        if (g_audio_buffer.written < AUDIO_BUFFER_CHUNKS)
+            audio_update();
+        else
+            sceKernelDelayThread(1000); /* 1 ms */
+    }
+    return 0;
+}
+
+void audio_start_thread()
+{
+    s_audio_thread_id = sceKernelCreateThread("audio_decode", audio_thread_func, 0x12, 0x4000, 0, NULL);
+    if (s_audio_thread_id >= 0)
+        sceKernelStartThread(s_audio_thread_id, 0, NULL);
+}
+
 void audio_end()
 {
+    if (s_audio_thread_id >= 0)
+    {
+        sceKernelTerminateThread(s_audio_thread_id);
+        sceKernelDeleteThread(s_audio_thread_id);
+        s_audio_thread_id = -1;
+    }
     pspAudioEnd();
 }
 

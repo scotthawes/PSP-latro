@@ -64,6 +64,7 @@ int main(int argc, char **argv)
     sceKernelDcacheWritebackAll();
 
     audio_init();
+    if (g_settings.audio) audio_start_thread();
 
     graphics_init();
 
@@ -75,7 +76,6 @@ int main(int argc, char **argv)
     {
         while(running())
         {
-            if (g_settings.audio) audio_update();
             input_update();
             game_update();
             game_draw();
