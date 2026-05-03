@@ -14,7 +14,7 @@ This document catalogues targeted improvements to the existing codebase, focused
    - ✅ 1.5 [Redundant Dcache Flush at End of Frame](#15-redundant-dcache-flush-at-end-of-frame)  
    - 1.6 [Audio Decoding Runs on the Main Thread](#16-audio-decoding-runs-on-the-main-thread)
 2. [UI Improvements](#2-ui-improvements)
-   - 2.1 [Analog Stick Unused Despite Being Configured](#21-analog-stick-unused-despite-being-configured)  
+   - ✅ 2.1 [Analog Stick Unused Despite Being Configured](#21-analog-stick-unused-despite-being-configured)  
    - ✅ 2.2 [Large Numbers Have No Thousands Separator](#22-large-numbers-have-no-thousands-separator)  
    - ✅ 2.3 [Default Animation Speed is the Slowest Setting](#23-default-animation-speed-is-the-slowest-setting)  
    - 2.4 [Placeholder Joker Names in Stub Entries](#24-placeholder-joker-names-in-stub-entries)  
@@ -167,7 +167,7 @@ The audio system already has the right architecture — a ring buffer (`AUDIO_BU
 
 ## 2. UI Improvements
 
-### 2.1 Analog Stick Unused Despite Being Configured
+### ✅ 2.1 Analog Stick Unused Despite Being Configured
 
 **File:** `src/input.c`, `src/game_input.c`  
 **Priority:** Medium | **Difficulty:** Low–Medium  
