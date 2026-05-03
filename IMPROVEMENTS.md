@@ -21,7 +21,7 @@ This document catalogues targeted improvements to the existing codebase, focused
    - ✅ 2.5 [Some UI Labels Use Small Font Where Big Font Fits](#25-some-ui-labels-use-small-font-where-big-font-fits)  
    - ✅ 2.6 [Formatted-Text Centering Traverses String Twice](#26-formatted-text-centering-traverses-string-twice)
 3. [Code Quality / Hygiene](#3-code-quality--hygiene)
-   - 3.1 [MAX_QUADS Inconsistency with Vertex Array Size](#31-max_quads-inconsistency-with-vertex-array-size)
+   - ✅ 3.1 [MAX_QUADS Inconsistency with Vertex Array Size](#31-max_quads-inconsistency-with-vertex-array-size)
 4. [Summary Table](#4-summary-table)
 
 ---
@@ -295,7 +295,7 @@ void graphics_draw_text_formatted_center(...) {
 
 ## 3. Code Quality / Hygiene
 
-### 3.1 MAX_QUADS Inconsistency with Vertex Array Size
+### ✅ 3.1 MAX_QUADS Inconsistency with Vertex Array Size
 
 **File:** `src/graphics.c`, lines 60 and ~40  
 **Priority:** Low | **Difficulty:** Trivial  
