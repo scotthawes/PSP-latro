@@ -11,12 +11,12 @@ This document catalogues targeted improvements to the existing codebase, focused
    - ✅ 1.2 [Increase MAX_QUADS to Reduce Flush Frequency](#12-increase-max_quads-to-reduce-flush-frequency)  
    - ✅ 1.3 [Enable 333 MHz Overclock by Default](#13-enable-333-mhz-overclock-by-default)  
    - ✅ 1.4 [Scoped Dcache Flush for Rotated Quads](#14-scoped-dcache-flush-for-rotated-quads)  
-   - 1.5 [Redundant Dcache Flush at End of Frame](#15-redundant-dcache-flush-at-end-of-frame)  
+   - ✅ 1.5 [Redundant Dcache Flush at End of Frame](#15-redundant-dcache-flush-at-end-of-frame)  
    - 1.6 [Audio Decoding Runs on the Main Thread](#16-audio-decoding-runs-on-the-main-thread)
 2. [UI Improvements](#2-ui-improvements)
    - 2.1 [Analog Stick Unused Despite Being Configured](#21-analog-stick-unused-despite-being-configured)  
    - 2.2 [Large Numbers Have No Thousands Separator](#22-large-numbers-have-no-thousands-separator)  
-   - 2.3 [Default Animation Speed is the Slowest Setting](#23-default-animation-speed-is-the-slowest-setting)  
+   - ✅ 2.3 [Default Animation Speed is the Slowest Setting](#23-default-animation-speed-is-the-slowest-setting)  
    - 2.4 [Placeholder Joker Names in Stub Entries](#24-placeholder-joker-names-in-stub-entries)  
    - 2.5 [Some UI Labels Use Small Font Where Big Font Fits](#25-some-ui-labels-use-small-font-where-big-font-fits)  
    - 2.6 [Formatted-Text Centering Traverses String Twice](#26-formatted-text-centering-traverses-string-twice)
@@ -121,7 +121,7 @@ sceKernelDcacheWritebackRange(g_quad_vertices, sizeof(struct Vertex) * 4);
 
 ---
 
-### 1.5 Redundant Dcache Flush at End of Frame
+### ✅ 1.5 Redundant Dcache Flush at End of Frame
 
 **File:** `src/graphics.c`, line 57  
 **Priority:** Low | **Difficulty:** Low  
@@ -215,7 +215,7 @@ Replace direct `sprintf(str, "%d", chips)` calls in the score/chip display funct
 
 ---
 
-### 2.3 Default Animation Speed is the Slowest Setting
+### ✅ 2.3 Default Animation Speed is the Slowest Setting
 
 **File:** `src/automated_events.c`, `assets/settings.ini`  
 **Priority:** Medium | **Difficulty:** Trivial  
