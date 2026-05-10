@@ -31,6 +31,40 @@ Agents
 - LocalizationSync
   - Sync/localize strings into `src/` or an external locale file.
 
+- Copilot Agent
+  - Prompt template: `.copilot/prompts/copilot-agent.yml`
+  - Runner script: `.copilot/tools/run_agent.sh`
+  - Purpose: Render prompt templates deterministically and produce artifact bundles (prompt + metadata + optional output) under `.copilot/artifacts/`.
+  - Usage: `./.copilot/tools/run_agent.sh .copilot/prompts/copilot-agent.yml myrun "Summarize repo status" "src/"`
+
+- PSP Build
+  - Skill: `.copilot/skills/psp-build/SKILL.md`
+  - Use: Building, packaging, reproducible Docker builds, linking issues.
+
+- PSP Graphics
+  - Skill: `.copilot/skills/psp-graphics/SKILL.md`
+  - Use: GU/GUM rendering, batching, texture formats, cache writebacks.
+
+- PSP Audio
+  - Skill: `.copilot/skills/psp-audio/SKILL.md`
+  - Use: OGG/Vorbis decoding, ringbuffer, audio callbacks, underrun handling.
+
+- PSP Assets
+  - Skill: `.copilot/skills/psp-assets/SKILL.md`
+  - Use: Asset conversions, texture atlases, image/audio transforms, Git LFS guidance.
+
+- PSP Deploy
+  - Skill: `.copilot/skills/psp-deploy/SKILL.md`
+  - Use: pack-pbp, PARAM.SFO, USB/FTP deployment and CI packaging.
+
+- PSP Debugging
+  - Skill: `.copilot/skills/psp-debugging/SKILL.md`
+  - Use: Device-only regressions, logs, screenshot diffs, emulator vs hardware comparisons.
+
+- PSP Performance
+  - Skill: `.copilot/skills/psp-performance/SKILL.md`
+  - Use: Frame timing, profiling, cache and memory tuning, overclock guidance.
+
 How to use
 
 - Ask the assistant to "Run AssetBuilder" or run the script directly.

@@ -1,0 +1,20 @@
+name: copilot-agent/task-runner
+version: "1.0"
+description: "Template to ask the Copilot agent to perform a reproducible task in the PSP-latro repo."
+model: "<MODEL_PLACEHOLDER>"
+
+template: |
+  You are the Copilot Agent for the PSP-latro repository.
+  Task: {{task}}
+  Files: {{files}}
+  Constraints: {{constraints}}
+
+  Output format:
+  - JSON object with keys: `summary` (string), `changes` (array of unified-diff strings), `tests` (array of shell commands), `artifact` (optional string referencing generated output file).
+
+  Provide a short human summary, then the JSON payload only. Do not include secrets or API keys.
+
+examples:
+  - task: "Summarize recent repo hygiene changes and list files requiring manual review."
+    files: "chore/repo-hygiene"
+    constraints: "Keep output under 800 tokens, provide a 3-line summary and a JSON payload."
