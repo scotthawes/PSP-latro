@@ -1,3 +1,40 @@
+.DS_Store
+.DS_Store??
+# macOS
+# Build outputs
+/build/
+
+# Generated assets
+/assets/out/
+
+# Packaged files and binaries
+EBOOT.PBP
+*.pbp
+*.elf
+*.iso
+
+# PSP SDKs / local installs
+psp-sdk/
+
+# Editor directories
+.vscode/
+.idea/
+
+# Swap & temp files
+*.swp
+*.swo
+*.tmp
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Other
+Thumbs.db
+.env
 *.sh
 *.PBP
 *.SFO

@@ -1,0 +1,7 @@
+{
+  "agents": [
+    {"id": "assetbuilder", "script": "scripts/asset_builder/build_assets.sh", "trigger": "assets/src/**", "description": "Converts and packs audio/textures into assets/out"},
+    {"id": "pspbuilder", "script": "scripts/pspbuilder/build_with_docker.sh", "trigger": "src/**, Makefile", "description": "Builds project using pspsdk (Docker or host)"},
+    {"id": "testrunner", "script": "scripts/testrunner/run_smoke_test.sh", "trigger": "pull_request or manual", "description": "Runs PPSSPP smoke tests and screenshot diffs"}
+  ]
+}

@@ -588,7 +588,8 @@ int game_util_get_new_joker_type(int excluded_joker_types[], int excluded_joker_
     }
 
     // TODO : add repeated jokers if possible_joker_count == 0
-    if (possible_joker_count == 0) return 0;
+    // Fallback: allow repeated jokers if pool is exhausted
+    if (possible_joker_count == 0) return rand() % JOKER_TYPE_COUNT;
 
     return possible_jokers[rand()%possible_joker_count];
 }

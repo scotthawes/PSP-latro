@@ -1,0 +1,54 @@
+name: PSP Builder
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/**'
+      - 'Makefile'
+      - 'assets/**'
+  pull_request:
+    paths:
+      - 'src/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/psp-sdk:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build (make)
+        run: |
+          set -e
+          make clean || true
+          if command -v nproc >/dev/null 2>&1; then
+            MAKEFLAGS="-j$(nproc)"
+          else
+            MAKEFLAGS="-j2"
+          fi
+          make $MAKEFLAGS || make
+
+      - name: Pack (if available)
+        run: |
+          if make -n pack >/dev/null 2>&1; then
+            make pack || true
+          fi
+
+      - name: Collect artifacts
+        run: |
+          rm -rf out || true
+          mkdir -p out
+          if [ -f build/EBOOT.PBP ]; then cp build/EBOOT.PBP out/; fi
+          if [ -f EBOOT.PBP ]; then cp EBOOT.PBP out/ || true; fi
+          if [ -f pspalatro.elf ]; then cp pspalatro.elf out/ || true; fi
+          if [ -z "$(ls -A out)" ]; then touch out/.empty; fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eboot
+          path: out

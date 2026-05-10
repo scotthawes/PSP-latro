@@ -1,0 +1,74 @@
+name: Test Runner (PR)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'Makefile'
+
+jobs:
+  smoke-self-host:
+    name: Smoke tests (self-hosted)
+    runs-on: [self-hosted, linux, ppsspp]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare scripts
+        run: |
+          chmod +x scripts/pspbuilder/*.sh scripts/testrunner/*.sh
+
+      - name: Build
+        run: |
+          scripts/pspbuilder/build_with_docker.sh $GITHUB_WORKSPACE all
+
+      - name: Run smoke test
+        run: |
+          scripts/testrunner/run_smoke_test.sh true
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: testrunner-output
+          path: test-output
+
+  smoke-best-effort:
+    name: Smoke tests (best-effort)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick x11-apps xwd python3 python3-pip || true
+          pip3 install --user pillow || true
+          sudo apt-get install -y ppsspp || true
+
+      - name: Prepare scripts
+        run: chmod +x scripts/pspbuilder/*.sh scripts/testrunner/*.sh
+
+      - name: Check for PPSSPP
+        id: check_ppsspp
+        run: |
+          if command -v ppsspp >/dev/null 2>&1; then
+            echo "ppsspp=true" >> $GITHUB_OUTPUT
+          else
+            echo "ppsspp=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run smoke test
+        if: steps.check_ppsspp.outputs.ppsspp == 'true'
+        run: scripts/testrunner/run_smoke_test.sh true || true
+
+      - name: Skip message if unavailable
+        if: steps.check_ppsspp.outputs.ppsspp == 'false'
+        run: |
+          echo "PPSSPP not available on runner; skipping smoke test" > test-output/skipped.txt
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: testrunner-output
+          path: test-output

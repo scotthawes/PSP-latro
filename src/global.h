@@ -117,6 +117,9 @@ extern const char *g_edition_hint[CARD_EDITION_COUNT];
 #define CARD_SEAL_RED       2
 #define CARD_SEAL_BLUE      3
 #define CARD_SEAL_PURPLE    4
+#define CARD_SEAL_COUNT     5
+
+extern const char *g_seal_hint[CARD_SEAL_COUNT];
 
 struct DrawObject
 {
@@ -323,7 +326,7 @@ struct CardReferences
 #define JOKER_TYPE_TRIBOULET            146
 #define JOKER_TYPE_YORICK               147
 #define JOKER_TYPE_CHICOT               148
-#define JOKER_TYPE_PARKEO               149
+#define JOKER_TYPE_PERKEO               149
 
 #define JOKER_TYPE_COUNT                150
 

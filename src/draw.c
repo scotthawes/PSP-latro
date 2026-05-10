@@ -52,6 +52,8 @@ int font_big, font_small;
 #define UI_ASSETS_SPADES            7
 
 #define UI_ASSETS_COUNT             8
+#define SEAL_TEXTURE_WIDTH          32
+#define SEAL_TEXTURE_HEIGHT         32
 
 struct TexCoords
 {
@@ -77,11 +79,20 @@ g_gamepad_ui_text_coords[GAMEPAD_UI_COUNT] = {
     { 160, 64 }  // GAMEPAD_UI_RIGHT_TRIGGER 
 },
 g_editions_tex_coords[CARD_EDITION_COUNT] = {
+    // Base and Polychrome intentionally share the first editions tile.
+    // Base never draws this overlay path; Polychrome uses it.
     { 1, 1 },   // CARD_EDITION_BASE
     { 143, 1 }, // CARD_EDITION_FOIL        
     { 72, 1 }, // CARD_EDITION_HOLOGRAPHIC        
     { 1, 1 }, // CARD_EDITION_POLYCHROME      
     { 1, 1 },   // CARD_EDITION_NEGATIVE  
+},
+g_seal_tex_coords[CARD_SEAL_COUNT] = {
+    { 0, 0 },       // CARD_SEAL_NONE
+    { 154, 16 },    // CARD_SEAL_GOLD
+    { 359, 414 },   // CARD_SEAL_RED
+    { 431, 414 },   // CARD_SEAL_BLUE
+    { 287, 414 }    // CARD_SEAL_PURPLE
 },
 g_ui_assets_tex_coords[UI_ASSETS_COUNT] = {
     { 0, 0 }, // UI_ASSETS_CHIP
@@ -199,6 +210,7 @@ void game_draw_card_hint(struct Card *card)
     if (card->extra_chips > 0) line_count++;
     if (card->enhancement != CARD_ENHANCEMENT_NONE && card->enhancement != CARD_ENHANCEMENT_STONE) line_count++;
     if (card->edition != CARD_EDITION_BASE) line_count++;
+    if (card->seal != CARD_SEAL_NONE) line_count++;
 
     float left = card->draw.x - CARD_HINT_WIDTH / 2.0f + CARD_WIDTH / 2.0f;
     if (left > SCREEN_WIDTH - CARD_HINT_WIDTH)
@@ -240,6 +252,12 @@ void game_draw_card_hint(struct Card *card)
     if (card->edition != CARD_EDITION_BASE)
     {
         graphics_draw_text_formatted_center(font_small, g_edition_hint[card->edition], NULL, left + CARD_HINT_WIDTH / 2.0f, text_y, 1.0f, COLOR_BLACK);
+        text_y += 8.0f;
+    }
+
+    if (card->seal != CARD_SEAL_NONE)
+    {
+        graphics_draw_text_formatted_center(font_small, g_seal_hint[card->seal], NULL, left + CARD_HINT_WIDTH / 2.0f, text_y, 1.0f, COLOR_BLACK);
     }
 }
 
@@ -528,6 +546,21 @@ void game_draw_card(struct Card *card, struct DrawObject *draw_override)
     {        
         graphics_set_texture(tex_editions, GRAPHICS_TEXTURE_FILTER_LINEAR);
         graphics_draw_rotated_quad(x, y, w, h, g_editions_tex_coords[card->edition].x, g_editions_tex_coords[card->edition].y, TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, 0x7FFFFFFF, card->draw.angle);
+    }
+
+    if (card->seal != CARD_SEAL_NONE)
+    {
+        float seal_w = 16.0f * draw->scale;
+        float seal_h = 16.0f * draw->scale;
+        float seal_x = x + (w - seal_w) / 2.0f;
+        float seal_y = y + h - seal_h - (2.0f * draw->scale);
+
+        graphics_set_texture(tex_enhancers, GRAPHICS_TEXTURE_FILTER_LINEAR);
+        graphics_draw_rotated_quad(
+            seal_x, seal_y, seal_w, seal_h,
+            g_seal_tex_coords[card->seal].x, g_seal_tex_coords[card->seal].y,
+            SEAL_TEXTURE_WIDTH, SEAL_TEXTURE_HEIGHT,
+            COLOR_WHITE, card->draw.angle);
     }
 
     if (card->draw.white_factor > 0.0f)
