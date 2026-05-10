@@ -31,6 +31,12 @@ Agents
 - LocalizationSync
   - Sync/localize strings into `src/` or an external locale file.
 
+- Copilot Agent
+  - Prompt template: `.copilot/prompts/copilot-agent.yml`
+  - Runner script: `.copilot/tools/run_agent.sh`
+  - Purpose: Render prompt templates deterministically and produce artifact bundles (prompt + metadata + optional output) under `.copilot/artifacts/`.
+  - Usage: `./.copilot/tools/run_agent.sh .copilot/prompts/copilot-agent.yml myrun "Summarize repo status" "src/"`
+
 How to use
 
 - Ask the assistant to "Run AssetBuilder" or run the script directly.
