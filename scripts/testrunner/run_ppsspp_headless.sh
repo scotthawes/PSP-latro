@@ -40,7 +40,7 @@ cat > "$TMP_SCRIPT" <<EOF
 #!/usr/bin/env bash
 set -eo pipefail
 "$PPSSPP_BIN" "$EBOOT" &
-EMUPID=$!
+EMUPID=\$!
 sleep $DURATION
 if command -v import >/dev/null 2>&1; then
   import -window root "$OUT" || true
@@ -54,8 +54,8 @@ else
     fi
   fi
 fi
-if [ -n "${EMUPID:-}" ]; then
-  kill "$EMUPID" || true
+if [ -n "\${EMUPID:-}" ]; then
+  kill "\$EMUPID" || true
 fi
 EOF
 
