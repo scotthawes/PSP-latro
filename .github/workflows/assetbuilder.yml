@@ -1,0 +1,31 @@
+name: Asset Builder
+
+on:
+  push:
+    paths:
+      - 'assets/src/**'
+  pull_request:
+    paths:
+      - 'assets/src/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg imagemagick pngquant python3
+      - name: Run AssetBuilder
+        run: |
+          chmod +x scripts/asset_builder/*.sh
+          scripts/asset_builder/build_assets.sh
+      - name: Upload assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-out
+          path: assets/out

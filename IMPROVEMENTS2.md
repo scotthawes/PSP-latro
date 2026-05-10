@@ -2,7 +2,7 @@
 
 A fresh audit of the codebase following completion of all Round 1 items. Covers three areas: bug fixes, code-quality hygiene, and UI/data correctness.
 
-**Status: §1.1-§2.3 IMPLEMENTED ✅** | Branch: `feature/round2-bug-fixes`
+**Status: §1.1-§2.3, §2.5, §3.1-§3.9 IMPLEMENTED (except §1.6, §2.4) ✅** | Branch: `feature/round2-remaining-fixes`
 
 ---
 
@@ -14,24 +14,25 @@ A fresh audit of the codebase following completion of all Round 1 items. Covers 
    - [x] 1.3 [`audio_load_ogg` Does Not Check `fopen` Return Value](#13-audio_load_ogg-does-not-check-fopen-return-value)
    - [x] 1.4 [Buffer Overflow in `strcpy` for `archive_file_name`](#14-buffer-overflow-in-strcpy-for-archive_file_name)
    - [x] 1.5 [Joker Slot Accounting Missing NEGATIVE Joker Bonus](#15-joker-slot-accounting-missing-negative-joker-bonus)
+   - [ ] 1.6 [Background Music Silent After Startup](#16-background-music-silent-after-startup)
 
 2. [Code Quality / Hygiene](#2-code-quality--hygiene)
    - [x] 2.1 [Remove Commented-Out Interpolation Block in `audio_update`](#21-remove-commented-out-interpolation-block-in-audio_update)
    - [x] 2.2 [`temp_buffer` Lacks `static` Linkage](#22-temp_buffer-lacks-static-linkage)
    - [x] 2.3 [`g_freeze_cards` Lacks `static` Linkage](#23-g_freeze_cards-lacks-static-linkage)
    - [ ] 2.4 [Unimplemented TODO: Spectral Booster Pack Handling](#24-unimplemented-todo-spectral-booster-pack-handling)
-   - [ ] 2.5 [Unimplemented TODO: Fallback Joker Selection](#25-unimplemented-todo-fallback-joker-selection)
+    - [x] 2.5 [Unimplemented TODO: Fallback Joker Selection](#25-unimplemented-todo-fallback-joker-selection)
 
 3. [UI / Data Fixes](#3-ui--data-fixes)
-   - [ ] 3.1 ["Troubadour" Misspelled as "Troubador"](#31-troubadour-misspelled-as-troubador)
-   - [ ] 3.2 [Wrathful / Gluttonous Joker Hints Missing Suit Color Codes](#32-wrathful--gluttonous-joker-hints-missing-suit-color-codes)
-   - [ ] 3.3 [The World Tarot Hint Missing Color Code for Spades](#33-the-world-tarot-hint-missing-color-code-for-spades)
-   - [ ] 3.4 [Unimplemented Jokers Show "test" as In-Game Hint Text](#34-unimplemented-jokers-show-test-as-in-game-hint-text)
-   - [ ] 3.5 [Polychrome Edition Has No Visual Overlay](#35-polychrome-edition-has-no-visual-overlay)
-   - [ ] 3.6 [Card Seals Are Never Drawn](#36-card-seals-are-never-drawn)
-   - [ ] 3.7 [Card Hint Does Not Show Seal Information](#37-card-hint-does-not-show-seal-information)
-   - [ ] 3.8 [JOKER_TYPE_PARKEO Enum Misspelled (Should Be PERKEO)](#38-joker_type_parkeo-enum-misspelled-should-be-perkeo)
-   - [ ] 3.9 [Negative Edition Hint Missing Effect Description](#39-negative-edition-hint-missing-effect-description)
+    - [x] 3.1 ["Troubadour" Misspelled as "Troubador"](#31-troubadour-misspelled-as-troubador)
+    - [x] 3.2 [Wrathful / Gluttonous Joker Hints Missing Suit Color Codes](#32-wrathful--gluttonous-joker-hints-missing-suit-color-codes)
+    - [x] 3.3 [The World Tarot Hint Missing Color Code for Spades](#33-the-world-tarot-hint-missing-color-code-for-spades)
+    - [x] 3.4 [Unimplemented Jokers Show "test" as In-Game Hint Text](#34-unimplemented-jokers-show-test-as-in-game-hint-text)
+    - [x] 3.5 [Polychrome Edition Has No Visual Overlay](#35-polychrome-edition-has-no-visual-overlay)
+    - [x] 3.6 [Card Seals Are Never Drawn](#36-card-seals-are-never-drawn)
+    - [x] 3.7 [Card Hint Does Not Show Seal Information](#37-card-hint-does-not-show-seal-information)
+    - [x] 3.8 [JOKER_TYPE_PARKEO Enum Misspelled (Should Be PERKEO)](#38-joker_type_parkeo-enum-misspelled-should-be-perkeo)
+    - [x] 3.9 [Negative Edition Hint Missing Effect Description](#39-negative-edition-hint-missing-effect-description)
 
 4. [Summary Table](#4-summary-table)
 
@@ -193,6 +194,39 @@ bool game_util_has_room_in_jokers()
     return g_game_state.jokers.joker_count < effective_slots;
 }
 ```
+
+---
+
+### 1.6 Background Music Silent After Startup
+
+**File:** `src/audio.c`, `audio_callback()` / `audio_update()` / `audio_play_ogg()`  
+**Priority:** High | **Difficulty:** Medium  
+
+Background music does not play on device despite `audio = true` in `settings.ini` and `resources/sounds/music1.ogg` being present inside the game archive. The loading screen shows no error, `audio_load_ogg_from_archive` returns 0, and `audio_play_ogg` is called — but the PSP remains completely silent throughout the session.
+
+**Investigation so far:**
+
+| Candidate | Ruled out? | Notes |
+|---|---|---|
+| Missing OGG file in archive | ✅ Ruled out | `game.love` confirmed to contain `resources/sounds/music1.ogg` (2.9 MB) |
+| `audio = false` in settings | ✅ Ruled out | `settings.ini` on device has `audio = true` |
+| `audio_load_ogg_from_archive` fails silently | ✅ Ruled out | No NULL check previously; NULL-check added — no error displayed on load screen |
+| §1.1 underrun `memset` zeroing all output | ✅ Ruled out | Reverted; still silent |
+| `ov_open_callbacks` decoder init failure | ⚠️ Unconfirmed | Returns 0 on success; validation added but not yet tested on-device with debug build |
+| Audio decode thread never fills buffer | ⚠️ Unconfirmed | `g_audio_buffer.ogg_id` must be ≥ 0 for `audio_update` to run; race condition possible |
+| `pspAudioSetChannelCallback` not binding correctly | ⚠️ Unconfirmed | Callback fires only after `pspAudioInit` reserves a channel; if channel 0 is busy the callback is silently skipped |
+
+**What is known:**
+- The audio thread starts before `audio_play_ogg` is called (`audio_start_thread` is in `main()`, `audio_play_ogg` is inside `init_more_stuff()`). The thread enters `audio_update` but `g_audio_buffer.ogg_id` is still `-1` at that point, so it spins doing nothing. By the time `audio_play_ogg` sets `ogg_id = 0`, the thread is already running — this ordering is correct.
+- `audio_play_ogg` resets `read_pos`, `write_pos`, and `written` to 0 and sets `src_buffer_size`. Nothing here is suspicious.
+- The `audio_callback` path that copies chunks (`written > 0`) requires the decode thread to have pre-filled at least one chunk before the callback fires. If the PSP audio DMA fires the callback before the first chunk is ready, and the underrun path does nothing (current state after §1.1 revert), the callback outputs whatever junk was in `buf` — but this is transient and should self-correct once the decode thread catches up.
+
+**Suspected root cause:** The decode thread is not writing decoded samples into `g_audio_buffer.chunks`. Most likely cause is `ov_read` returning 0 or an error code on every call — this would cause the `while (total < src_buffer_size)` loop to spin forever calling `ov_pcm_seek` on every iteration, never advancing `total`, and `audio_update` never reaches the copy/increment block. This could be triggered by a corrupted or incompatible OGG stream (wrong sample rate or channel count for PSP).
+
+**Next steps to confirm:**
+1. Build with `DEBUG=1`, capture serial output, look for `ov_read` return values in `audio_update`.
+2. Check `vorbis_info` for the music file — PSP pspaudiolib expects 44100 Hz stereo; a different sample rate would cause silent or no output.
+3. If sample rate mismatch: re-encode `music1.ogg` at 44100 Hz stereo, or implement sample-rate conversion in `audio_update`.
 
 ---
 
@@ -400,14 +434,19 @@ g_editions_tex_coords[CARD_EDITION_COUNT] = {
     { 1,   1 },   // CARD_EDITION_BASE        (never drawn)
     { 143, 1 },   // CARD_EDITION_FOIL        ✅
     { 72,  1 },   // CARD_EDITION_HOLOGRAPHIC ✅
-    { 1,   1 },   // CARD_EDITION_POLYCHROME  ← same as BASE: nothing visible
+    { 1,   1 },   // CARD_EDITION_POLYCHROME
     { 1,   1 },   // CARD_EDITION_NEGATIVE    (handled separately via GU_COPY_INVERTED)
 };
 ```
 
-`CARD_EDITION_NEGATIVE` is intentionally excluded from the editions-overlay draw path (the joker draw code uses `GU_COPY_INVERTED` instead). But `CARD_EDITION_POLYCHROME` falls through to the editions draw path and submits coordinates `{1,1}` — which is the top-left corner of the editions texture, likely a blank or near-blank region. Polychrome cards therefore look identical to base cards rather than showing the rainbow shimmer overlay.
+**Verification result:** The UV for `CARD_EDITION_POLYCHROME` is already correct. The top-left tile in `assets/editions.png` (sampled at `{1,1}` with size `69x93`) contains the rainbow polychrome overlay, not a blank region. `CARD_EDITION_BASE` sharing the same UV is harmless because base edition cards never draw the editions overlay path.
 
-**Fix:** Identify the correct UV coordinates for the Polychrome pattern within `editions.png` and set them in the table. If `editions.png` doesn't contain a Polychrome pattern, one should be authored.
+Foil/Holographic/Polychrome mapping is therefore:
+- Foil: `{143,1}`
+- Holographic: `{72,1}`
+- Polychrome: `{1,1}`
+
+**Fix:** No code change needed; mark this item as verified.
 
 ---
 
@@ -416,11 +455,17 @@ g_editions_tex_coords[CARD_EDITION_COUNT] = {
 **File:** `src/draw.c`, `game_draw_card()`  
 **Priority:** Medium | **Difficulty:** Medium  
 
-The `Card` struct has a `seal` field (`CARD_SEAL_NONE / GOLD / RED / BLUE / PURPLE`) and game logic sets seals during play (e.g. from Tarot cards). However `game_draw_card()` never reads `card->seal` — no seal overlay is ever rendered. Players who acquire sealed cards see no visual distinction on the card face.
+Implemented in `game_draw_card()` by drawing a seal sprite overlay when `card->seal != CARD_SEAL_NONE`.
 
-In Balatro the seal appears as a small coloured wax-stamp icon at the bottom of the card, sourced from the Enhancers texture sheet.
+**Implementation details:**
+- Added seal UV mapping sourced from `resources/textures/1x/Enhancers.png`
+- Gold seal: `{154,16}`
+- Red seal: `{359,414}`
+- Blue seal: `{431,414}`
+- Purple seal: `{287,414}`
+- Draws as a rotated overlay near the bottom-center of the card using a `16x16` on-card sprite size (scaled with card zoom)
 
-**Fix:** Identify the seal sprite coordinates within the Enhancers texture (or add them to a `ui_assets.png` slot), then draw a small overlay at the bottom of the card in `game_draw_card()` when `card->seal != CARD_SEAL_NONE`. A colour-tinted version of a single stamp sprite is sufficient.
+This now makes sealed cards visually distinct during hand/deck/shop rendering.
 
 ---
 
@@ -497,6 +542,7 @@ g_edition_hint[CARD_EDITION_NEGATIVE] = "#d#1Negative#- +1 Joker Slot";
 | 1.3 | `audio_load_ogg` unchecked `fopen` | Medium | Trivial | `audio.c` |
 | 1.4 | Buffer overflow in `strcpy` for `archive_file_name` | **High** | Trivial | `game.c` |
 | 1.5 | Joker slot accounting missing NEGATIVE bonus | Medium | Low | `game_util.c` |
+| 1.6 | Background music silent after startup | **High** | Medium | `audio.c` |
 | 2.1 | Remove commented-out interpolation block | Low | Trivial | `audio.c` |
 | 2.2 | `temp_buffer` needs `static` | Low | Trivial | `audio.c` |
 | 2.3 | `g_freeze_cards` needs `static` | Low | Trivial | `draw.c` |
@@ -506,8 +552,8 @@ g_edition_hint[CARD_EDITION_NEGATIVE] = "#d#1Negative#- +1 Joker Slot";
 | 3.2 | Wrathful/Gluttonous missing suit color codes | Medium | Trivial | `game.c` |
 | 3.3 | The World tarot missing `#5` code | Low | Trivial | `game.c` |
 | 3.4 | "test" placeholder hints on ~30 jokers | Medium | Low | `game.c` |
-| 3.5 | Polychrome edition no visual overlay | Medium | Low | `draw.c`, `editions.png` |
-| 3.6 | Card seals never drawn | Medium | Medium | `draw.c` |
+| 3.5 | Polychrome overlay mapping verified (no code change needed) | Medium | Low | `draw.c`, `assets/editions.png` |
+| 3.6 | Card seals rendered on card art | Medium | Medium | `draw.c` |
 | 3.7 | Card hint doesn't show seal | Low | Low | `draw.c`, `game.c` |
 | 3.8 | JOKER_TYPE_PARKEO → JOKER_TYPE_PERKEO | Low | Trivial | `game.c` |
 | 3.9 | Negative edition hint missing effect | Low | Trivial | `game.c` |

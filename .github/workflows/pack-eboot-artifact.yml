@@ -1,0 +1,32 @@
+name: Pack and Upload EBOOT artifact
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pack:
+    name: Build and pack EBOOT
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/psp-sdk:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make pack script executable
+        run: chmod +x scripts/pspbuilder/pack_eboot.sh
+
+      - name: Pack EBOOT
+        run: scripts/pspbuilder/pack_eboot.sh --out build
+
+      - name: List build files
+        run: ls -la build || true
+
+      - name: Upload EBOOT artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EBOOT.PBP
+          path: build/EBOOT.PBP
