@@ -40,3 +40,6 @@ Thumbs.db
 *.SFO
 *.elf
 *.o
+# Copilot/AI artifacts (kept on dedicated branch)
+/.copilot/artifacts/
+!/.copilot/artifacts/README.md
