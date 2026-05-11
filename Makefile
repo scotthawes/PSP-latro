@@ -1,5 +1,5 @@
 BUILD_PRX=0
-DEBUG=0
+DEBUG=1
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 PSPDIR=$(shell psp-config --psp-prefix)
@@ -7,7 +7,7 @@ PSPDIR=$(shell psp-config --psp-prefix)
 TARGET = pspalatro
 OBJS = src/main.o
 
-CFLAGS = -Wall -Wno-unused-label -G0 -Ofast
+CFLAGS = -Wall -Wno-unused-label -G0 -Ofast -DDEBUG
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
