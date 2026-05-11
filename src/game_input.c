@@ -1133,6 +1133,15 @@ void game_input_update(bool no_input)
         case INPUT_FOCUSED_ZONE_RUN_INFO_CLOSE:
             game_input_update_run_info_close(no_input);
             break;
+        case INPUT_FOCUSED_ZONE_MENU_TITLE:
+            menu_input_title(no_input);
+            break;
+        case INPUT_FOCUSED_ZONE_MENU_MAIN:
+            menu_input_main(no_input);
+            break;
+        case INPUT_FOCUSED_ZONE_MENU_OPTIONS:
+            menu_input_options(no_input);
+            break;
         default:
             break;
     }

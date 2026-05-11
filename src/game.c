@@ -1737,6 +1737,14 @@ void game_init_logic()
     g_game_state.deck_info.effective = false;
 }
 
+void game_begin_new_run()
+{
+    game_init_logic();
+    g_game_state.stage = GAME_STAGE_BLINDS;
+    g_game_state.sub_stage = GAME_SUBSTAGE_BLINDS_DEFAULT;
+    g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_BLIND;
+}
+
 void game_restart_game()
 {
     game_init_logic();
@@ -2056,6 +2064,14 @@ void game_go_to_stage(int stage, int sub_stage)
                     break;
                 }
             }            
+            break;
+        }
+        case GAME_STAGE_MENU:
+        {
+            g_game_state.menu_selected_item = 0;
+            g_game_state.input_focused_zone = (sub_stage == GAME_SUBSTAGE_MENU_TITLE)
+                ? INPUT_FOCUSED_ZONE_MENU_TITLE
+                : INPUT_FOCUSED_ZONE_MENU_MAIN;
             break;
         }
     }

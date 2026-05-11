@@ -1933,6 +1933,9 @@ void game_draw()
 
     switch (g_game_state.stage)
     {
+        case GAME_STAGE_MENU:
+            menu_draw();
+            break;
         case GAME_STAGE_BLINDS:
             game_draw_blind_select();            
             break;
