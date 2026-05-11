@@ -182,6 +182,26 @@ int main(int argc, char **argv)
     graphics_init();
     boot_log("main: graphics_init done");
 
+    // Render-path self-test: should show obvious full-screen color flashes before game init.
+    for (int i = 0; i < 90; i++)
+    {
+        graphics_begin_draw();
+        if ((i / 15) % 3 == 0)
+        {
+            graphics_clear(COLOR_RED);
+        }
+        else if ((i / 15) % 3 == 1)
+        {
+            graphics_clear(COLOR_GREEN);
+        }
+        else
+        {
+            graphics_clear(COLOR_BLUE);
+        }
+        graphics_end_draw();
+    }
+    boot_log("main: render self-test done");
+
     input_init();
     boot_log("main: input_init done");
 
