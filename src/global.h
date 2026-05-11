@@ -498,6 +498,11 @@ extern double g_booster_packs_weights_total;
 #define GAME_STAGE_BLINDS   0
 #define GAME_STAGE_INGAME   1
 #define GAME_STAGE_SHOP     2
+#define GAME_STAGE_MENU     3
+
+#define GAME_SUBSTAGE_MENU_TITLE    0
+#define GAME_SUBSTAGE_MENU_MAIN     1
+#define GAME_SUBSTAGE_MENU_OPTIONS  2
 
 #define GAME_SUBSTAGE_BLINDS_DEFAULT        0
 
@@ -633,6 +638,9 @@ struct GameState
         INPUT_FOCUSED_ZONE_DECK_INFO_CARD ,
         INPUT_FOCUSED_ZONE_RUN_INFO_CLOSE ,
         INPUT_FOCUSED_ZONE_RUN_INFO       ,
+        INPUT_FOCUSED_ZONE_MENU_TITLE     ,
+        INPUT_FOCUSED_ZONE_MENU_MAIN      ,
+        INPUT_FOCUSED_ZONE_MENU_OPTIONS   ,
     } input_focused_zone, previous_input_focused_zone;
 
     // ingame
@@ -723,6 +731,8 @@ struct GameState
     bool flush_five_enabled;
     bool flush_house_enabled;
     bool five_of_a_kind_enabled;
+
+    int menu_selected_item;
 
     struct
     {
@@ -1149,5 +1159,12 @@ enum IniTokenType ini_read_token(char *buffer, int buffer_size);
 #define GAME_CHANCE_UNCOMMON_JOKER      25  // 25%
 #define GAME_CHANCE_RARE_JOKER           5  //  5%
 
+// Menu forward declarations (menu.c included after draw.c in unity build)
+void menu_draw();
+void menu_input_title(bool no_input);
+void menu_input_main(bool no_input);
+void menu_input_options(bool no_input);
 
+// game.c forward declaration used in menu.c
+void game_begin_new_run();
 

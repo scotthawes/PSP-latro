@@ -13,6 +13,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #include "game_util.c"
 #include "entity_event.c"
 #include "automated_events.c"
+#include "menu.c"
 #include "game_input.c"
 #include "game.c"
 
