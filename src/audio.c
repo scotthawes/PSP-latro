@@ -1,6 +1,7 @@
 #include "global.h"
 
 #include <vorbis/vorbisfile.h>
+#include <errno.h>
 
 #define AUDIO_BUFFER_CHUNKS  8
 #define AUDIO_BUFFER_SIZE   4096
@@ -50,7 +51,8 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
         else
         {
             g_debug_info.audio_wait_read++;
-            /* PSP DMA replays previous frame on underrun — intentional for PSP audio */
+            /* Audio underrun: zero-fill buffer to prevent garbage samples */
+            memset(buf, 0, AUDIO_BUFFER_SIZE);
         }
     }
     else
@@ -61,8 +63,18 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
 
 void audio_init()
 {
-    pspAudioInit();
+    int ret = pspAudioInit();
+    if (ret < 0)
+    {
+        DEBUG_PRINTF("[AUDIO] pspAudioInit() failed: %d\n", ret);
+    }
+    else
+    {
+        DEBUG_PRINTF("[AUDIO] pspAudioInit() success\n");
+    }
+    
     pspAudioSetChannelCallback(0, audio_callback, NULL);
+    DEBUG_PRINTF("[AUDIO] pspAudioSetChannelCallback() set\n");
 
     g_audio_buffer.ogg_id = -1;
 
@@ -83,16 +95,38 @@ void audio_update()
         int current_section;
         long ret = 0, total = 0;
         char *buf_ptr = temp_buffer;
+        int decode_errors = 0;
+        
         while (total < g_audio_buffer.src_buffer_size)
         {
-            ret = ov_read(&(g_ogg_files[g_audio_buffer.ogg_id].vorbis_file),buf_ptr,g_audio_buffer.src_buffer_size - total,0,2,1,&current_section);
-            if (ret == 0)
+            ret = ov_read(&(g_ogg_files[g_audio_buffer.ogg_id].vorbis_file),
+                          buf_ptr,
+                          g_audio_buffer.src_buffer_size - total,
+                          0, 2, 1, &current_section);
+            
+            if (ret < 0)
             {
-                ov_pcm_seek(&(g_ogg_files[g_audio_buffer.ogg_id].vorbis_file), 0);
+                /* ov_read error */
+                DEBUG_PRINTF("[AUDIO] ov_read error: %ld at offset %ld\n", ret, total);
+                decode_errors++;
+                if (decode_errors > 3)
+                    break; /* Prevent infinite loop on persistent errors */
+            }
+            else if (ret == 0)
+            {
+                /* End of stream: seek back to beginning */
+                int seek_ret = ov_pcm_seek(&(g_ogg_files[g_audio_buffer.ogg_id].vorbis_file), 0);
+                if (seek_ret != 0)
+                {
+                    DEBUG_PRINTF("[AUDIO] ov_pcm_seek error: %d\n", seek_ret);
+                }
                 continue;
             }
-            total += ret;
-            buf_ptr += ret;
+            else
+            {
+                total += ret;
+                buf_ptr += ret;
+            }
         }
 
         struct sample_t *dst = (struct sample_t *)g_audio_buffer.chunks[g_audio_buffer.write_pos].data;
@@ -114,10 +148,16 @@ void audio_update()
 
         g_audio_buffer.write_pos = (g_audio_buffer.write_pos + 1) % AUDIO_BUFFER_CHUNKS;
         g_audio_buffer.written++;
+        
+        DEBUG_PRINTF("[AUDIO] Decode ok: decoded=%ld bytes, written=%d, read_pos=%d, fill=%d/%d\n",
+                     total, g_audio_buffer.write_pos, g_audio_buffer.read_pos, 
+                     g_audio_buffer.written, AUDIO_BUFFER_CHUNKS);
     }
-    else
+    else if (g_audio_buffer.written >= AUDIO_BUFFER_CHUNKS)
     {
         g_debug_info.audio_wait_write++;
+        DEBUG_PRINTF("[AUDIO] Buffer full, write stalled (fill=%d/%d)\n",
+                     g_audio_buffer.written, AUDIO_BUFFER_CHUNKS);
     }
 }
 
@@ -138,19 +178,45 @@ static int audio_thread_func(SceSize args, void *argp)
 void audio_start_thread()
 {
     s_audio_thread_id = sceKernelCreateThread("audio_decode", audio_thread_func, 0x12, 0x4000, 0, NULL);
-    if (s_audio_thread_id >= 0)
-        sceKernelStartThread(s_audio_thread_id, 0, NULL);
+    if (s_audio_thread_id < 0)
+    {
+        DEBUG_PRINTF("[AUDIO] sceKernelCreateThread() failed: %d\n", s_audio_thread_id);
+        return;
+    }
+    
+    DEBUG_PRINTF("[AUDIO] audio_decode thread created: id=%d\n", s_audio_thread_id);
+    
+    int ret = sceKernelStartThread(s_audio_thread_id, 0, NULL);
+    if (ret < 0)
+    {
+        DEBUG_PRINTF("[AUDIO] sceKernelStartThread() failed: %d\n", ret);
+        sceKernelDeleteThread(s_audio_thread_id);
+        s_audio_thread_id = -1;
+    }
+    else
+    {
+        DEBUG_PRINTF("[AUDIO] audio_decode thread started\n");
+    }
 }
 
 void audio_end()
 {
     if (s_audio_thread_id >= 0)
     {
-        sceKernelTerminateThread(s_audio_thread_id);
-        sceKernelDeleteThread(s_audio_thread_id);
+        int ret = sceKernelTerminateThread(s_audio_thread_id);
+        if (ret < 0)
+            DEBUG_PRINTF("[AUDIO] sceKernelTerminateThread() failed: %d\n", ret);
+        
+        ret = sceKernelDeleteThread(s_audio_thread_id);
+        if (ret < 0)
+            DEBUG_PRINTF("[AUDIO] sceKernelDeleteThread() failed: %d\n", ret);
+        
         s_audio_thread_id = -1;
+        DEBUG_PRINTF("[AUDIO] audio_decode thread stopped and deleted\n");
     }
+    
     pspAudioEnd();
+    DEBUG_PRINTF("[AUDIO] pspAudioEnd() called\n");
 }
 
 size_t audio_ogg_callback_read_ogg(void* dst, size_t size1, size_t size2, void* fh)
@@ -209,14 +275,50 @@ int audio_load_ogg(char *filename)
     FILE *fp_ogg = fopen(filename, "rb");
     if (fp_ogg == NULL)
     {
-        DEBUG_PRINTF("audio_load_ogg: could not open \"%s\"\n", filename);
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: fopen() failed for \"%s\" (errno=%d)\n", filename, errno);
         return -1;
     }
-    fseek(fp_ogg, 0, SEEK_END);
+    
+    if (fseek(fp_ogg, 0, SEEK_END) != 0)
+    {
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: fseek(SEEK_END) failed for \"%s\"\n", filename);
+        fclose(fp_ogg);
+        return -1;
+    }
+    
     long fsize = ftell(fp_ogg);
-    fseek(fp_ogg, 0, SEEK_SET);
+    if (fsize <= 0)
+    {
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: invalid file size %ld for \"%s\"\n", fsize, filename);
+        fclose(fp_ogg);
+        return -1;
+    }
+    
+    if (fseek(fp_ogg, 0, SEEK_SET) != 0)
+    {
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: fseek(SEEK_SET) failed for \"%s\"\n", filename);
+        fclose(fp_ogg);
+        return -1;
+    }
+    
     g_ogg_files[0].file_ptr = malloc(fsize + 1);
-    fread(g_ogg_files[0].file_ptr, fsize, 1, fp_ogg);
+    if (g_ogg_files[0].file_ptr == NULL)
+    {
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: malloc(%ld) failed\n", fsize);
+        fclose(fp_ogg);
+        return -1;
+    }
+    
+    size_t read_size = fread(g_ogg_files[0].file_ptr, 1, fsize, fp_ogg);
+    if (read_size != (size_t)fsize)
+    {
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: fread() returned %zu, expected %ld\n", read_size, fsize);
+        free(g_ogg_files[0].file_ptr);
+        g_ogg_files[0].file_ptr = NULL;
+        fclose(fp_ogg);
+        return -1;
+    }
+    
     fclose(fp_ogg);
 
     ov_callbacks callbacks;
@@ -232,7 +334,7 @@ int audio_load_ogg(char *filename)
 
     if (ov_open_callbacks((void *)&(g_ogg_files[0]), &(g_ogg_files[0].vorbis_file), NULL, -1, callbacks) != 0)
     {
-        DEBUG_PRINTF("audio_load_ogg: ov_open_callbacks failed for \"%s\"\n", filename);
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg: ov_open_callbacks() failed for \"%s\"\n", filename);
         free(g_ogg_files[0].file_ptr);
         g_ogg_files[0].file_ptr = NULL;
         g_ogg_files[0].cur_ptr = NULL;
@@ -243,7 +345,7 @@ int audio_load_ogg(char *filename)
 
 #ifdef DEBUG    
     {
-        DEBUG_PRINTF("Ogg file \"%s\" loaded.\n", filename);
+        DEBUG_PRINTF("[AUDIO] Ogg file loaded: \"%s\" (%ld bytes)\n", filename, fsize);
 
         char **ptr=ov_comment(&(g_ogg_files[0].vorbis_file),-1)->user_comments;
         vorbis_info *vi=ov_info(&(g_ogg_files[0].vorbis_file),-1);
@@ -251,9 +353,9 @@ int audio_load_ogg(char *filename)
           DEBUG_PRINTF("\t%s\n",*ptr);
           ++ptr;
         }
-        DEBUG_PRINTF("\n\tBitstream is %d channel, %ldHz\n",vi->channels,vi->rate);
-        DEBUG_PRINTF("\n\tDecoded length: %ld samples\n", (long)ov_pcm_total(&(g_ogg_files[0].vorbis_file),-1));
-        DEBUG_PRINTF("\tEncoded by: %s\n\n",ov_comment(&(g_ogg_files[0].vorbis_file),-1)->vendor);
+        DEBUG_PRINTF("\tBitstream: %d channels, %ld Hz\n",vi->channels,vi->rate);
+        DEBUG_PRINTF("\tDecoded length: %ld samples\n", (long)ov_pcm_total(&(g_ogg_files[0].vorbis_file),-1));
+        DEBUG_PRINTF("\tEncoded by: %s\n",ov_comment(&(g_ogg_files[0].vorbis_file),-1)->vendor);
     }
 #endif
 
@@ -266,7 +368,7 @@ int audio_load_ogg_from_archive(char *filename)
     g_ogg_files[0].file_ptr = (char *)archive_load_file_entry(filename, &file_size);
     if (g_ogg_files[0].file_ptr == NULL || file_size == 0)
     {
-        DEBUG_PRINTF("audio_load_ogg_from_archive: missing file \"%s\" in archive\n", filename);
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg_from_archive: archive_load_file_entry() failed for \"%s\"\n", filename);
         g_ogg_files[0].cur_ptr = NULL;
         g_ogg_files[0].file_size = 0;
         g_ogg_files[0].in_use = false;
@@ -286,7 +388,7 @@ int audio_load_ogg_from_archive(char *filename)
 
     if (ov_open_callbacks((void *)&(g_ogg_files[0]), &(g_ogg_files[0].vorbis_file), NULL, -1, callbacks) != 0)
     {
-        DEBUG_PRINTF("audio_load_ogg_from_archive: ov_open_callbacks failed for \"%s\"\n", filename);
+        DEBUG_PRINTF("[AUDIO] audio_load_ogg_from_archive: ov_open_callbacks() failed for \"%s\"\n", filename);
         free(g_ogg_files[0].file_ptr);
         g_ogg_files[0].file_ptr = NULL;
         g_ogg_files[0].cur_ptr = NULL;
@@ -297,7 +399,7 @@ int audio_load_ogg_from_archive(char *filename)
 
 #ifdef DEBUG    
     {
-        DEBUG_PRINTF("Ogg file \"%s\" loaded.\n", filename);
+        DEBUG_PRINTF("[AUDIO] Ogg file loaded from archive: \"%s\" (%zu bytes)\n", filename, file_size);
 
         char **ptr=ov_comment(&(g_ogg_files[0].vorbis_file),-1)->user_comments;
         vorbis_info *vi=ov_info(&(g_ogg_files[0].vorbis_file),-1);
@@ -305,9 +407,9 @@ int audio_load_ogg_from_archive(char *filename)
           DEBUG_PRINTF("\t%s\n",*ptr);
           ++ptr;
         }
-        DEBUG_PRINTF("\n\tBitstream is %d channel, %ldHz\n",vi->channels,vi->rate);
-        DEBUG_PRINTF("\n\tDecoded length: %ld samples\n", (long)ov_pcm_total(&(g_ogg_files[0].vorbis_file),-1));
-        DEBUG_PRINTF("\tEncoded by: %s\n\n",ov_comment(&(g_ogg_files[0].vorbis_file),-1)->vendor);
+        DEBUG_PRINTF("\tBitstream: %d channels, %ld Hz\n",vi->channels,vi->rate);
+        DEBUG_PRINTF("\tDecoded length: %ld samples\n", (long)ov_pcm_total(&(g_ogg_files[0].vorbis_file),-1));
+        DEBUG_PRINTF("\tEncoded by: %s\n",ov_comment(&(g_ogg_files[0].vorbis_file),-1)->vendor);
     }
 #endif
 
