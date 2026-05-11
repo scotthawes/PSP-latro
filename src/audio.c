@@ -40,6 +40,16 @@ struct OggFile
 
 void audio_callback(void* buf, unsigned int length, void *userdata)
 {    
+    static int callback_count = 0;
+    callback_count++;
+    
+    if (callback_count % 100 == 0)
+    {
+        DEBUG_PRINTF("[AUDIO] callback #%d: ogg_id=%d, written=%d/%d, read_pos=%d, write_pos=%d\n",
+                     callback_count, g_audio_buffer.ogg_id, g_audio_buffer.written, 
+                     AUDIO_BUFFER_CHUNKS, g_audio_buffer.read_pos, g_audio_buffer.write_pos);
+    }
+    
     if (g_audio_buffer.ogg_id > -1)
     {
         if (g_audio_buffer.written > 0)
@@ -76,7 +86,13 @@ void audio_init()
     pspAudioSetChannelCallback(0, audio_callback, NULL);
     DEBUG_PRINTF("[AUDIO] pspAudioSetChannelCallback() set\n");
 
+    /* Initialize audio buffer state */
     g_audio_buffer.ogg_id = -1;
+    g_audio_buffer.read_pos = 0;
+    g_audio_buffer.write_pos = 0;
+    g_audio_buffer.written = 0;
+    g_audio_buffer.speed = 1.0f;
+    g_audio_buffer.src_buffer_size = AUDIO_BUFFER_SIZE;
 
     g_debug_info.audio_wait_read = 0;
     g_debug_info.audio_wait_write = 0;
@@ -165,12 +181,26 @@ static SceUID s_audio_thread_id = -1;
 
 static int audio_thread_func(SceSize args, void *argp)
 {
+    DEBUG_PRINTF("[AUDIO] Audio decode thread started, monitoring buffer fill\n");
+    
+    int idle_count = 0;
     while (1)
     {
         if (g_audio_buffer.written < AUDIO_BUFFER_CHUNKS)
+        {
             audio_update();
+            idle_count = 0;
+        }
         else
+        {
+            idle_count++;
+            if (idle_count % 1000 == 0)
+            {
+                DEBUG_PRINTF("[AUDIO] Thread sleeping (buffer full): fill=%d/%d\n",
+                             g_audio_buffer.written, AUDIO_BUFFER_CHUNKS);
+            }
             sceKernelDelayThread(1000); /* 1 ms */
+        }
     }
     return 0;
 }
@@ -418,19 +448,27 @@ int audio_load_ogg_from_archive(char *filename)
 
 void audio_play_ogg(int ogg_id, float speed)
 {
+    if (ogg_id < 0)
+    {
+        DEBUG_PRINTF("[AUDIO] audio_play_ogg: invalid ogg_id %d\n", ogg_id);
+        return;
+    }
+    
+    DEBUG_PRINTF("[AUDIO] audio_play_ogg: starting playback with ogg_id=%d, speed=%.1f\n", ogg_id, speed);
+    
     g_audio_buffer.ogg_id = ogg_id;
     g_audio_buffer.read_pos = 0;
     g_audio_buffer.write_pos = 0;
     g_audio_buffer.written = 0;
+    
+    /* Clamp speed to valid range [0.5f, 1.0f] */
     g_audio_buffer.speed = (speed > 1.0f ? 1.0f : (speed <= 0.0f ? 1.0f : speed));
-    if (g_audio_buffer.speed == 1.0f)
-    {
-        g_audio_buffer.src_buffer_size = AUDIO_BUFFER_SIZE;
-    }
-    else
-    {
-        g_audio_buffer.src_buffer_size = (int)((float)(AUDIO_BUFFER_SIZE / 4) * (float)g_audio_buffer.speed) * 4;
-    }
+    
+    /* Always use full buffer size for now - speed scaling can be tuned later */
+    g_audio_buffer.src_buffer_size = AUDIO_BUFFER_SIZE;
+    
+    DEBUG_PRINTF("[AUDIO] Buffer configured: src_size=%d, speed=%.2f\n", 
+                 g_audio_buffer.src_buffer_size, g_audio_buffer.speed);
 }
 
 void audio_stop()
