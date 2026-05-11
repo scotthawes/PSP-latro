@@ -62,6 +62,7 @@ struct Settings
 };
 
 extern struct Settings g_settings;
+extern bool g_init_resources_ok;
 
 #define CARD_RANK_2     0
 #define CARD_RANK_3     1

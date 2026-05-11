@@ -28,6 +28,7 @@ static const char *s_main_menu_labels[MENU_MAIN_ITEM_COUNT] = {
 // Draw a solid rectangle using the existing GU quad batcher
 static void menu_draw_rect(float x, float y, float w, float h, uint32_t color)
 {
+    graphics_set_no_texture();
     graphics_draw_quad(x, y, w, h, 0, 0, 0, 0, color);
 }
 
@@ -104,6 +105,12 @@ static void menu_draw_main()
     // Controls hint
     graphics_draw_text_center(font_small, "Up/Down: Navigate   X: Select",
                               SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT - 14.0f, 1.0f, COLOR_LIGHT_GREY);
+
+    if (!g_init_resources_ok)
+    {
+        graphics_draw_text_center(font_small, "Assets not loaded - New Run disabled",
+                                  SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT - 30.0f, 1.0f, COLOR_TEXT_RED);
+    }
 }
 
 // ----------------------------------------------------------------
@@ -161,6 +168,21 @@ static void menu_draw_options()
 // ----------------------------------------------------------------
 void menu_draw()
 {
+    if (g_game_state.sub_stage == GAME_SUBSTAGE_MENU_MAIN)
+    {
+        if (g_game_state.menu_selected_item < 0 || g_game_state.menu_selected_item >= MENU_MAIN_ITEM_COUNT)
+        {
+            g_game_state.menu_selected_item = 0;
+        }
+    }
+    else if (g_game_state.sub_stage == GAME_SUBSTAGE_MENU_OPTIONS)
+    {
+        if (g_game_state.menu_selected_item < 0 || g_game_state.menu_selected_item >= MENU_OPTIONS_ITEM_COUNT)
+        {
+            g_game_state.menu_selected_item = 0;
+        }
+    }
+
     switch (g_game_state.sub_stage)
     {
         case GAME_SUBSTAGE_MENU_TITLE:
@@ -218,7 +240,10 @@ void menu_input_main(bool no_input)
         switch (g_game_state.menu_selected_item)
         {
             case MENU_MAIN_ITEM_NEW_RUN:
-                game_begin_new_run();
+                if (g_init_resources_ok)
+                {
+                    game_begin_new_run();
+                }
                 break;
             case MENU_MAIN_ITEM_OPTIONS:
                 g_game_state.menu_selected_item = 0;
