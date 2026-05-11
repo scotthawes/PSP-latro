@@ -8,10 +8,11 @@ FILE *g_ini_file = NULL;
 
 bool ini_open(const char *filename)
 {
+    DEBUG_PRINTF("Attempting to open INI file: %s\n", filename);
     g_ini_file = fopen(filename, "r");
     if (g_ini_file == NULL)
     {
-        DEBUG_PRINTF("Error: Could not open INI file\n");
+        DEBUG_PRINTF("Error: Could not open INI file: %s\n", filename);
         return false;
     }
 

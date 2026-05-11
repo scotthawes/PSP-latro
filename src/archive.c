@@ -1,22 +1,60 @@
 #include "global.h"
 #include <zip.h>
+#include <unistd.h>
+#include <errno.h>
 
 zip_source_t *g_archive_source = NULL;
 zip_t *g_archive_file = NULL;
 
 bool archive_open(const char *filename)
 {
-    char str[64];
-    sprintf(str, "Opening archive \"%s\"", filename);
-    game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
-    FILE *fp = fopen(filename, "rb");
+    char str[128];
+    char cwd[256] = {0};
+    char attempts[7][256] = {{0}};
+    int attempt_count = 0;
+
+    if (!getcwd(cwd, sizeof(cwd)))
+    {
+        strcpy(cwd, "(failed)");
+    }
+
+    DEBUG_PRINTF("archive_open cwd: %s\n", cwd);
+
+    // Search common runtime locations.
+    snprintf(attempts[attempt_count++], 256, "%s", filename);
+    snprintf(attempts[attempt_count++], 256, "./%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../../%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/./%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/%s", filename);
+
+    FILE *fp = NULL;
+    int attempt_index = -1;
+    for (int i = 0; i < attempt_count; i++)
+    {
+        fp = fopen(attempts[i], "rb");
+        if (fp)
+        {
+            attempt_index = i;
+            DEBUG_PRINTF("archive_open success[%d]: %s\n", i, attempts[i]);
+            break;
+        }
+
+        DEBUG_PRINTF("archive_open fail[%d] errno=%d path=%s\n", i, errno, attempts[i]);
+    }
+
     if (!fp)
     {
-        sprintf(str, "Can't open \"%s\"", filename);
+        snprintf(str, sizeof(str), "Can't open %s", filename);
         game_draw_loading_text(str, COLOR_TEXT_RED, COLOR_BLACK);
+        DEBUG_PRINTF("archive_open failed for %s\n", filename);
+        DEBUG_PRINTF("archive_open cwd: %s\n", cwd);
         return false;
     }
 
+    game_draw_loading_text("Opening archive...", COLOR_WHITE, COLOR_BLACK);
+    
     // Look for start of archive in the file
     size_t count = 0;
     uint8_t buffer[4];
@@ -56,17 +94,31 @@ bool archive_open(const char *filename)
     }
     fclose(fp);
 
-    DEBUG_PRINTF("Archive header found in %d\n", count);
+    DEBUG_PRINTF("Archive header found at offset %zu\n", count);
 
     zip_error_t error;
-    g_archive_source = zip_source_file_create(filename, count, -1, &error);
+    zip_error_init(&error);
+    g_archive_source = zip_source_file_create(attempts[attempt_index], count, -1, &error);
+    if (!g_archive_source)
+    {
+        sprintf(str, "Error creating zip source: %s", zip_error_strerror(&error));
+        game_draw_loading_text(str, COLOR_TEXT_RED, COLOR_BLACK);
+        DEBUG_PRINTF("zip_source_file_create failed: %s\n", zip_error_strerror(&error));
+        zip_error_fini(&error);
+        return false;
+    }
+    
     g_archive_file = zip_open_from_source(g_archive_source, 0, &error);
     if (!g_archive_file)
     {
-        sprintf(str, "Error opening archive in file \"%s\"", filename);
+        sprintf(str, "Error opening zip: %s", zip_error_strerror(&error));
         game_draw_loading_text(str, COLOR_TEXT_RED, COLOR_BLACK);
+        DEBUG_PRINTF("zip_open_from_source failed: %s\n", zip_error_strerror(&error));
+        zip_error_fini(&error);
         return false;
     }
+    
+    zip_error_fini(&error);
 
     return true;
 }
