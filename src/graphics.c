@@ -801,6 +801,11 @@ void graphics_set_texture(int texture, int filter)
     if (g_current_set_texture == texture && g_current_filter == filter) return;
 
     graphics_flush_quads();
+
+    if (texture >= 0 && (texture >= MAX_TEXTURES || !g_textures[texture].in_use))
+    {
+        texture = -1;
+    }
     
     g_current_set_texture = texture;
     g_current_filter = filter;
@@ -956,12 +961,16 @@ void graphics_draw_solid_quad(float x, float y, float w, float h, uint32_t color
 
 void graphics_draw_text_center(int font, const char *text, float x, float y, float size, uint32_t color)
 {
+    if (font < 0 || font >= MAX_FONTS || !g_fonts[font].in_use) return;
+
     int length = strlen(text);
     graphics_draw_text(font, text, x - ((float)length / 2.0f * g_fonts[font].width * size), y - (g_fonts[font].height * size / 2.0f), size, color);
 }
 
 void graphics_draw_text(int font, const char *text, float x, float y, float size, uint32_t color)
 {
+    if (font < 0 || font >= MAX_FONTS || !g_fonts[font].in_use) return;
+
     graphics_set_texture(g_fonts[font].texture, GRAPHICS_TEXTURE_FILTER_NEAREST);
 
     int count = 0;

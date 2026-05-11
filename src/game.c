@@ -1629,8 +1629,10 @@ void game_init_logic()
     g_game_state.last_used_consumable_item_type = -1;
     g_game_state.last_used_consumable_tarot_planet_type = -1;
 
-    g_game_state.stage = GAME_STAGE_BLINDS;
-    g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_BLIND;
+    g_game_state.stage = GAME_STAGE_MENU;
+    g_game_state.sub_stage = GAME_SUBSTAGE_MENU_TITLE;
+    g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_TITLE;
+    g_game_state.menu_selected_item = 0;
 
     g_game_state.sort_criteria = SORT_CRITERIA_RANK;
 
@@ -1735,6 +1737,9 @@ void game_init_logic()
 
     g_game_state.deck_info.partial = false;
     g_game_state.deck_info.effective = false;
+
+    // Route initial menu setup through stage transition logic.
+    game_go_to_stage(GAME_STAGE_MENU, GAME_SUBSTAGE_MENU_TITLE);
 }
 
 void game_begin_new_run()
@@ -2069,9 +2074,19 @@ void game_go_to_stage(int stage, int sub_stage)
         case GAME_STAGE_MENU:
         {
             g_game_state.menu_selected_item = 0;
-            g_game_state.input_focused_zone = (sub_stage == GAME_SUBSTAGE_MENU_TITLE)
-                ? INPUT_FOCUSED_ZONE_MENU_TITLE
-                : INPUT_FOCUSED_ZONE_MENU_MAIN;
+            switch (sub_stage)
+            {
+                case GAME_SUBSTAGE_MENU_TITLE:
+                    g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_TITLE;
+                    break;
+                case GAME_SUBSTAGE_MENU_OPTIONS:
+                    g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_OPTIONS;
+                    break;
+                case GAME_SUBSTAGE_MENU_MAIN:
+                default:
+                    g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_MAIN;
+                    break;
+            }
             break;
         }
     }
