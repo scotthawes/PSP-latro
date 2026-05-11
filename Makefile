@@ -7,7 +7,10 @@ PSPDIR=$(shell psp-config --psp-prefix)
 TARGET = pspalatro
 OBJS = src/main.o
 
-CFLAGS = -Wall -Wno-unused-label -G0 -Ofast -DDEBUG
+CFLAGS = -Wall -Wno-unused-label -G0 -Ofast
+ifeq ($(DEBUG),1)
+CFLAGS += -DDEBUG
+endif
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
