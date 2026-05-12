@@ -20,6 +20,11 @@ static int s_title_wallpaper_texture = -1;
 static int s_main_wallpaper_texture = -1;
 static bool s_wallpapers_initialized = false;
 static int s_wallpaper_variant = 0;
+static int s_title_logo_texture = -1;
+static bool s_title_logo_draw_logged = false;
+static int s_jokers_preview_texture = -1;
+static int s_tarots_preview_texture = -1;
+static bool s_cards_preview_draw_logged = false;
 
 #define MENU_WALLPAPER_VARIANT_COUNT 2
 static int s_title_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
@@ -43,6 +48,23 @@ static int menu_load_wallpaper_from_candidates(const char *candidates[], int can
             return texture;
         }
         DEBUG_PRINTF("[WALLPAPER] failed: %s\n", candidates[i]);
+    }
+
+    return -1;
+}
+
+static int menu_load_texture_from_candidates(const char *candidates[], int candidate_count)
+{
+    for (int i = 0; i < candidate_count; i++)
+    {
+        DEBUG_PRINTF("[ASSET_VERIFY] trying texture: %s\n", candidates[i]);
+        int texture = graphics_load_wallpaper(candidates[i]);
+        if (texture >= 0)
+        {
+            DEBUG_PRINTF("[ASSET_VERIFY] loaded texture: %s (texture=%d)\n", candidates[i], texture);
+            return texture;
+        }
+        DEBUG_PRINTF("[ASSET_VERIFY] failed texture: %s\n", candidates[i]);
     }
 
     return -1;
@@ -167,6 +189,35 @@ static void menu_init_wallpapers()
     s_title_wallpaper_texture = s_title_wallpaper_textures[s_wallpaper_variant];
     s_main_wallpaper_texture = s_main_wallpaper_textures[s_wallpaper_variant];
 
+    if (s_title_logo_texture < 0)
+    {
+        const char *title_logo_candidates[] = {
+            "balatro-ui-optimized/logo_main_psp.png"
+        };
+        s_title_logo_texture = menu_load_texture_from_candidates(title_logo_candidates, 1);
+    }
+
+    DEBUG_PRINTF("[ASSET_VERIFY] card preview load gate jokers=%d tarots=%d\n",
+                 s_jokers_preview_texture, s_tarots_preview_texture);
+
+    if (s_jokers_preview_texture < 0)
+    {
+        DEBUG_PRINTF("[ASSET_VERIFY] loading jokers preview texture\n");
+        const char *jokers_candidates[] = {
+            "balatro-cards-optimized/jokers/jokers_psp.png"
+        };
+        s_jokers_preview_texture = menu_load_texture_from_candidates(jokers_candidates, 1);
+    }
+
+    if (s_tarots_preview_texture < 0)
+    {
+        DEBUG_PRINTF("[ASSET_VERIFY] loading tarots preview texture\n");
+        const char *tarots_candidates[] = {
+            "balatro-cards-optimized/tarots/tarots_psp.png"
+        };
+        s_tarots_preview_texture = menu_load_texture_from_candidates(tarots_candidates, 1);
+    }
+
     s_wallpapers_initialized = true;
 }
 
@@ -219,14 +270,85 @@ static void menu_draw_title()
     menu_draw_rect(20, title_area_y, SCREEN_WIDTH - 40, title_area_h, 0xFF1A1A1A);
     menu_draw_rect_border(20, title_area_y, SCREEN_WIDTH - 40, title_area_h, 0xFF006D96, 2);
 
-    // Main title
-    graphics_draw_text_center(font_big, "PSPalatro", SCREEN_WIDTH / 2.0f, 75.0f, 2.5f, 0xFFC8AA6E);
+    if (s_title_logo_texture >= 0)
+    {
+        int logo_w = 0;
+        int logo_h = 0;
+        if (!graphics_get_texture_content_size(s_title_logo_texture, &logo_w, &logo_h))
+        {
+            logo_w = 185;
+            logo_h = 120;
+        }
+
+        float logo_scale = 1.0f;
+        float logo_draw_w = logo_w * logo_scale;
+        float logo_draw_h = logo_h * logo_scale;
+        float logo_x = (SCREEN_WIDTH - logo_draw_w) * 0.5f;
+        float logo_y = 54.0f;
+
+        graphics_set_texture(s_title_logo_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+        graphics_draw_quad(logo_x, logo_y, logo_draw_w, logo_draw_h, 0, 0, logo_w, logo_h, 0xFFFFFFFF);
+
+        if (!s_title_logo_draw_logged)
+        {
+            DEBUG_PRINTF("[ASSET_VERIFY] drawing title logo texture=%d at %.1f,%.1f size=%.1fx%.1f\n",
+                         s_title_logo_texture, logo_x, logo_y, logo_draw_w, logo_draw_h);
+            s_title_logo_draw_logged = true;
+        }
+    }
+    else
+    {
+        // Fallback title text when optimized logo is unavailable.
+        graphics_draw_text_center(font_big, "PSPalatro", SCREEN_WIDTH / 2.0f, 75.0f, 2.5f, 0xFFC8AA6E);
+    }
 
     // Subtitle
     graphics_draw_text_center(font_small, "A Balatro Port for PSP", SCREEN_WIDTH / 2.0f, 115.0f, 1.2f, 0xFF888888);
 
     // Decorative separator
     menu_draw_separator(40, 135, SCREEN_WIDTH - 80, 0xFF006D96);
+
+    // Milestone 2 card preview in title scene for automated render verification.
+    if (s_jokers_preview_texture >= 0)
+    {
+        int jokers_w = 0;
+        int jokers_h = 0;
+        if (graphics_get_texture_content_size(s_jokers_preview_texture, &jokers_w, &jokers_h))
+        {
+            float preview_w = 100.0f;
+            float preview_h = 54.0f;
+            float preview_x = SCREEN_WIDTH - preview_w - 18.0f;
+            float preview_y = 150.0f;
+
+            graphics_set_texture(s_jokers_preview_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+            graphics_draw_quad(preview_x, preview_y, preview_w, preview_h, 0, 0, jokers_w, jokers_h, 0xFFFFFFFF);
+            menu_draw_rect_border(preview_x, preview_y, preview_w, preview_h, 0xFFC8AA6E, 1);
+        }
+    }
+
+    if (s_tarots_preview_texture >= 0)
+    {
+        int tarots_w = 0;
+        int tarots_h = 0;
+        if (graphics_get_texture_content_size(s_tarots_preview_texture, &tarots_w, &tarots_h))
+        {
+            float preview_w = 80.0f;
+            float preview_h = 40.0f;
+            float preview_x = SCREEN_WIDTH - preview_w - 18.0f;
+            float preview_y = 208.0f;
+
+            graphics_set_texture(s_tarots_preview_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+            graphics_draw_quad(preview_x, preview_y, preview_w, preview_h, 0, 0, tarots_w, tarots_h, 0xFFFFFFFF);
+            menu_draw_rect_border(preview_x, preview_y, preview_w, preview_h, 0xFF006D96, 1);
+        }
+    }
+
+    if (!s_cards_preview_draw_logged && s_jokers_preview_texture >= 0 && s_tarots_preview_texture >= 0)
+    {
+        DEBUG_PRINTF("[ASSET_VERIFY] drawing card previews in title scene jokers_tex=%d tarots_tex=%d\n",
+                     s_jokers_preview_texture, s_tarots_preview_texture);
+        s_cards_preview_draw_logged = true;
+    }
 
     // Blinking "Press X to Start" with pulsing effect
     if ((g_game_counter / 30) % 2 == 0)
@@ -306,6 +428,41 @@ static void menu_draw_main()
     menu_draw_separator(30, hint_y, SCREEN_WIDTH - 60, 0xFF006D96);
     graphics_draw_text_center(font_small, "[Up/Down]  Navigate   [X]  Select   [O]  Back",
                               SCREEN_WIDTH / 2.0f, hint_y + 12.0f, 0.9f, 0xFF888888);
+
+    // Milestone 2 verification previews for optimized card sheets.
+    if (s_jokers_preview_texture >= 0)
+    {
+        int jokers_w = 0;
+        int jokers_h = 0;
+        if (graphics_get_texture_content_size(s_jokers_preview_texture, &jokers_w, &jokers_h))
+        {
+            float preview_w = 120.0f;
+            float preview_h = 64.0f;
+            float preview_x = SCREEN_WIDTH - preview_w - 18.0f;
+            float preview_y = 58.0f;
+
+            graphics_set_texture(s_jokers_preview_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+            graphics_draw_quad(preview_x, preview_y, preview_w, preview_h, 0, 0, jokers_w, jokers_h, 0xFFFFFFFF);
+            menu_draw_rect_border(preview_x, preview_y, preview_w, preview_h, 0xFFC8AA6E, 1);
+        }
+    }
+
+    if (s_tarots_preview_texture >= 0)
+    {
+        int tarots_w = 0;
+        int tarots_h = 0;
+        if (graphics_get_texture_content_size(s_tarots_preview_texture, &tarots_w, &tarots_h))
+        {
+            float preview_w = 96.0f;
+            float preview_h = 48.0f;
+            float preview_x = SCREEN_WIDTH - preview_w - 18.0f;
+            float preview_y = 126.0f;
+
+            graphics_set_texture(s_tarots_preview_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+            graphics_draw_quad(preview_x, preview_y, preview_w, preview_h, 0, 0, tarots_w, tarots_h, 0xFFFFFFFF);
+            menu_draw_rect_border(preview_x, preview_y, preview_w, preview_h, 0xFF006D96, 1);
+        }
+    }
 
     if (!g_init_resources_ok)
     {

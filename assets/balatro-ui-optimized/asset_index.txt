@@ -1,0 +1,19 @@
+# Milestone 1 asset index (source -> optimized output)
+
+# Logos
+assets/balatro-textures/1x/balatro.png -> assets/balatro-ui-optimized/logo_main_psp.png (185x120)
+assets/balatro-textures/1x/balatro_alt.png -> assets/balatro-ui-optimized/logo_alt_psp.png (185x120)
+
+# Icons extracted from icons.png (cell size 24x24)
+assets/balatro-textures/1x/icons.png [x=0,y=0,w=24,h=24] -> assets/balatro-ui-optimized/icons/icon_r0_c0.png
+assets/balatro-textures/1x/icons.png [x=24,y=0,w=24,h=24] -> assets/balatro-ui-optimized/icons/icon_r0_c1.png
+assets/balatro-textures/1x/icons.png [x=48,y=0,w=24,h=24] -> assets/balatro-ui-optimized/icons/icon_r0_c2.png
+assets/balatro-textures/1x/icons.png [x=72,y=0,w=24,h=24] -> assets/balatro-ui-optimized/icons/icon_r0_c3.png
+assets/balatro-textures/1x/icons.png [x=0,y=24,w=24,h=24] -> assets/balatro-ui-optimized/icons/icon_r1_c0.png
+assets/balatro-textures/1x/icons.png [x=24,y=24,w=24,h=24] -> assets/balatro-ui-optimized/icons/icon_r1_c1.png
+
+# Buttons/UI extracted from ui_assets.png (cell size 12x12)
+assets/balatro-textures/1x/ui_assets.png [x=0,y=0,w=12,h=12] -> assets/balatro-ui-optimized/buttons/button_r0_c0.png
+assets/balatro-textures/1x/ui_assets.png [x=12,y=0,w=12,h=12] -> assets/balatro-ui-optimized/buttons/button_r0_c1.png
+assets/balatro-textures/1x/ui_assets.png [x=24,y=0,w=12,h=12] -> assets/balatro-ui-optimized/buttons/button_r0_c2.png
+assets/balatro-textures/1x/ui_assets.png [x=36,y=0,w=12,h=12] -> assets/balatro-ui-optimized/buttons/button_r0_c3.png

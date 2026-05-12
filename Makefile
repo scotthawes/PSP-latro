@@ -35,6 +35,8 @@ sync_build_artifacts: EBOOT.PBP
 	@cp assets/out/assets/editions.png build/ 2>/dev/null || true
 	@cp -r assets/wallpapers build/assets/ 2>/dev/null || true
 	@cp -r assets/backgrounds build/assets/ 2>/dev/null || true
+	@cp -r assets/balatro-ui-optimized build/assets/ 2>/dev/null || true
+	@cp -r assets/balatro-cards-optimized build/assets/ 2>/dev/null || true
 	@cp settings.ini build/ 2>/dev/null || true
 	@echo "Synced build/EBOOT.PBP and local runtime assets."
 

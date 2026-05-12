@@ -6,6 +6,119 @@
 
 ---
 
+## Execution Checklist
+
+### Current Progress Snapshot
+- [x] Extracted original Balatro resources from game.love into third_party/balatro-v011-reference/game_assets_extracted/resources
+- [x] Created easy-access symlinks in assets/ (balatro-textures, balatro-sounds, balatro-fonts, balatro-shaders)
+- [x] Converted background.jpg to PSP-safe 480x272 PNG (assets/backgrounds/balatro_bg_alt.png)
+- [x] Verified background loads in runtime logs
+- [x] Create PSP-optimized UI/logo output set
+- [ ] Create PSP-optimized card sprites output set
+- [ ] Create PSP-optimized effects output set
+- [ ] Integrate optimized assets into runtime code paths
+- [ ] Verify visual quality and memory behavior in PPSSPP
+
+### Workboard (Methodical Order)
+
+### Mandatory Render Verification (Required For Every Asset Batch)
+- [ ] Build and sync after asset creation (`make clean && make -j4`)
+- [ ] Execute PPSSPP using `build/EBOOT.PBP`
+- [ ] Confirm new asset path appears in texture load logs
+- [ ] Confirm visual render in menu/game scene (not just load success)
+- [ ] Record pass/fail evidence in this checklist before closing task
+
+Evidence format (append under milestone task when tested):
+- Asset: <asset path>
+- Log: <loaded from path[n] ...>
+- Visual: Pass/Fail
+- Notes: <artifact quality issues, scaling artifacts, color banding, etc.>
+
+#### Milestone 1: UI and Branding (Fast Win)
+- [x] Create output folders: assets/balatro-ui-optimized/icons and assets/balatro-ui-optimized/buttons
+- [x] Resize balatro.png to logo_main_psp.png (target: ~240x120)
+- [x] Resize balatro_alt.png to logo_alt_psp.png (target: ~240x120)
+- [x] Extract at least 6 high-value icons from icons.png
+- [x] Extract at least 4 button/UI elements from ui_assets.png
+- [x] Produce a small index file listing source sprite -> output file
+
+Acceptance criteria:
+- [x] All files exist under assets/balatro-ui-optimized
+- [x] Logos are legible at PSP resolution
+- [x] Asset file names are stable and descriptive
+- [x] At least one Milestone 1 asset is runtime render-verified in PPSSPP
+
+Verification evidence:
+- Asset: assets/balatro-ui-optimized/logo_main_psp.png
+- Log: [ASSET_VERIFY] loaded texture: balatro-ui-optimized/logo_main_psp.png (texture=25)
+- Log: [ASSET_VERIFY] drawing title logo texture=25 at 147.5,54.0 size=185.0x120.0
+- Visual: Pass
+- Notes: Logo is loaded and drawn in title scene via runtime path, not just preloaded.
+
+#### Milestone 2: Core Cards
+- [x] Create output folders: assets/balatro-cards-optimized/jokers and assets/balatro-cards-optimized/tarots
+- [x] Generate Jokers test variants: 50% scale 16-bit, 50% scale quantized, 25% scale 16-bit
+- [x] Compare variants in PPSSPP and choose one default profile
+- [x] Export chosen joker sheet as jokers_psp.png
+- [x] Export chosen tarot sheet as tarots_psp.png
+- [x] Create card_meta.txt documenting sheet dimensions and intended sprite regions
+- [x] Render-verify chosen card sheets in PPSSPP and capture load + visual evidence
+
+Acceptance criteria:
+- [x] Chosen profile has acceptable readability on PSP
+- [x] Total size of cards-optimized folder stays within target budget
+- [x] Runtime can load both sheets using current texture loader path logic
+- [x] Visual verification completed in live PSP/PPSSPP render path
+
+Profile decision:
+- Default profile: 25% scale + reduced depth workflow
+- Reason: avoids PSP texture crop risk on large sheets while preserving usable readability and lower memory footprint.
+
+Verification evidence:
+- Asset: assets/balatro-cards-optimized/jokers/jokers_psp.png
+- Log: [TEX] Loaded balatro-cards-optimized/jokers/jokers_psp.png from path[4]: assets/balatro-cards-optimized/jokers/jokers_psp.png (178x380)
+- Log: [ASSET_VERIFY] loaded texture: balatro-cards-optimized/jokers/jokers_psp.png (texture=26)
+- Asset: assets/balatro-cards-optimized/tarots/tarots_psp.png
+- Log: [TEX] Loaded balatro-cards-optimized/tarots/tarots_psp.png from path[4]: assets/balatro-cards-optimized/tarots/tarots_psp.png (178x143)
+- Log: [ASSET_VERIFY] loaded texture: balatro-cards-optimized/tarots/tarots_psp.png (texture=27)
+- Draw: [ASSET_VERIFY] drawing card previews in title scene jokers_tex=26 tarots_tex=27
+- Visual: Pass
+- Notes: both optimized card sheets loaded from build/assets and rendered in title preview.
+
+#### Milestone 3: Effects and Supplemental Art
+- [ ] Create output folder: assets/balatro-effects-optimized
+- [ ] Optimize Enhancers.png, boosters.png, BlindChips.png with selected profile
+- [ ] Extract any required individual effect sprites if sheet-only approach is unclear
+- [ ] Write effects_meta.txt with sprite notes
+- [ ] Render-verify at least one effect asset in PPSSPP and capture evidence
+
+Acceptance criteria:
+- [ ] Effects look acceptable at PSP scale
+- [ ] No obvious texture budget warnings during load
+- [ ] Visual verification completed in live PSP/PPSSPP render path
+
+#### Milestone 4: Integration and Validation
+- [ ] Add/adjust runtime references to point at optimized assets
+- [ ] Ensure Makefile sync copies optimized folders to build/assets
+- [ ] Run clean build
+- [ ] Launch PPSSPP and capture texture load logs
+- [ ] Confirm no regressions in menu flow or wallpaper behavior
+- [ ] Confirm integrated optimized assets visually render in their intended scene/state
+
+Acceptance criteria:
+- [ ] Build succeeds
+- [ ] Assets resolve from expected paths
+- [ ] No startup hang/regression introduced
+
+### Definition of Done (Project-Level)
+- [ ] All targeted optimized folders exist under assets/
+- [ ] Optimized assets are synced into build/assets after build
+- [ ] Core menu art and selected gameplay art load successfully in PPSSPP
+- [ ] Texture memory behavior is acceptable for PSP constraints
+- [ ] Checklist marked complete for all milestones
+
+---
+
 ## PSP Hardware Constraints
 
 | Aspect | Limit | Impact |
@@ -204,23 +317,9 @@ magick jokers.png -crop 128x128+0+0 card_1.png
 
 ## Immediate Next Steps
 
-### Step 1: Test Downscaling
-Extract `Jokers.png` and test different scale/format combinations:
-1. 50% downscale, 16-bit 4444
-2. 50% downscale, 8-bit quantized + palette
-3. 25% downscale, 16-bit (ultra-conservative)
-
-Load in PPSSPP and compare quality vs. file size.
-
-### Step 2: Extract Key UI Assets
-- Resize `balatro.png` → `logo_main_psp.png` (240x120)
-- Extract individual icons from `icons.png`
-- Ready for immediate menu integration
-
-### Step 3: Create Sprite Reference
-- Document spritesheet layouts (which sprites where)
-- Create metadata file for sprite extraction
-- Plan individual card extraction if needed
+1. Complete Milestone 1 (UI and Branding) first.
+2. Run card variant bake-off from Milestone 2 before full card export.
+3. Integrate only after Milestones 1 and 2 assets are validated in PPSSPP logs.
 
 ---
 
@@ -274,11 +373,8 @@ Makefile `sync_build_artifacts` will copy `*-optimized/` folders to `build/asset
 
 ## Action Items
 
-- [ ] User selects optimization priority
-- [ ] Run test downscaling on Jokers.png (3 variants)
-- [ ] Load variants in PPSSPP, compare quality
-- [ ] Extract logo PNGs to menu size
-- [ ] Integrate optimized logos into menu system
-- [ ] Document spritesheet layouts for card extraction
-- [ ] Create PSP-optimized sprite management system
+- [x] Milestone 1 complete
+- [x] Milestone 2 complete
+- [ ] Milestone 3 complete
+- [ ] Milestone 4 complete
 
