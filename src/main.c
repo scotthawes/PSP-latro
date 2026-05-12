@@ -22,6 +22,8 @@ struct DebugInfo g_debug_info;
 int ogg_id = -1;
 bool g_init_resources_ok = false;
 
+#define FORCE_PRESENTATION_TEST 0
+
 static void boot_log(const char *message)
 {
     const char *paths[] = {
@@ -182,25 +184,32 @@ int main(int argc, char **argv)
     graphics_init();
     boot_log("main: graphics_init done");
 
-    // Render-path self-test: should show obvious full-screen color flashes before game init.
-    for (int i = 0; i < 90; i++)
+#if FORCE_PRESENTATION_TEST
+    // Iteration 2 diagnostic: bypass all game/menu systems and render obvious colors only.
+    uint32_t frame = 0;
+    while (running())
     {
         graphics_begin_draw();
-        if ((i / 15) % 3 == 0)
+        switch ((frame / 30) % 4)
         {
-            graphics_clear(COLOR_RED);
+            case 0: graphics_clear(COLOR_RED); break;
+            case 1: graphics_clear(COLOR_GREEN); break;
+            case 2: graphics_clear(COLOR_BLUE); break;
+            default: graphics_clear(COLOR_WHITE); break;
         }
-        else if ((i / 15) % 3 == 1)
-        {
-            graphics_clear(COLOR_GREEN);
-        }
-        else
-        {
-            graphics_clear(COLOR_BLUE);
-        }
+        graphics_set_no_texture();
+        graphics_draw_quad(20, 20, 120, 30, 0, 0, 0, 0, COLOR_BLACK);
         graphics_end_draw();
+        frame++;
     }
-    boot_log("main: render self-test done");
+
+    audio_end();
+    sceGuTerm();
+    sceKernelExitGame();
+    return 0;
+#endif
+
+
 
     input_init();
     boot_log("main: input_init done");

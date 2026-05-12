@@ -7,6 +7,8 @@ Files
 - `DEVGUIDE_PSP3000.md` — Developer guide and workflows for PSP-3000 builds and assets.
 - `COPILOT_GUIDE.md` — Copilot/AI usage guide and reproducibility rules.
 - `CONSOLIDATED_STATUS.md` — Consolidated current state, missing features, and prioritized improvements.
+- `MENU_FEATURE_WORKFLOW.md` — Task list and implementation/diagnostic workflow for menu and boot-path feature work.
+- `MENU_DESIGN_RESOURCES.md` — Source/reference map for menu design (original game scripts, PSPSDK samples, runtime notes).
 - `psxplace/` — (optional) archived PSX-Place threads and fetch artifacts.
 
 Removed / Consolidated

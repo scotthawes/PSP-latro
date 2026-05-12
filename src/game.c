@@ -2096,6 +2096,13 @@ uint32_t g_game_counter = 0;
 
 void game_update()
 {
+    if (g_game_state.stage == GAME_STAGE_MENU)
+    {
+        game_input_update(false);
+        g_game_counter++;
+        return;
+    }
+
     bool no_input = automated_event_run();
     event_run();
 

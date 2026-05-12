@@ -1928,38 +1928,7 @@ void game_draw_debug_info()
 void game_draw()
 {
     graphics_begin_draw();
-
-    if (g_game_state.stage == GAME_STAGE_MENU)
-    {
-        graphics_clear(COLOR_WHITE);
-    }
-    else
-    {
-        graphics_clear(COLOR_BACKGROUND_2);
-    }
-
-    // Stage diagnostic markers (texture-free, always visible if render path is alive).
-    graphics_set_no_texture();
-    if (g_game_state.stage == GAME_STAGE_MENU)
-    {
-        // Red marker: menu stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_RED);
-    }
-    else if (g_game_state.stage == GAME_STAGE_BLINDS)
-    {
-        // Green marker: blinds stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_GREEN);
-    }
-    else if (g_game_state.stage == GAME_STAGE_INGAME)
-    {
-        // Blue marker: ingame stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_BLUE);
-    }
-    else if (g_game_state.stage == GAME_STAGE_SHOP)
-    {
-        // Yellow marker: shop stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_YELLOW);
-    }
+    graphics_clear(COLOR_BACKGROUND_2);
 
     switch (g_game_state.stage)
     {
