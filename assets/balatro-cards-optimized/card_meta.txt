@@ -1,0 +1,25 @@
+# Milestone 2 card sprites metadata
+
+# Source assets
+assets/balatro-textures/1x/Jokers.png  (710x1520)
+assets/balatro-textures/1x/Tarots.png  (710x570)
+
+# Joker test variants
+assets/balatro-cards-optimized/jokers/jokers_50_16bit.png      355x760  ~209 KB
+assets/balatro-cards-optimized/jokers/jokers_50_quantized.png  355x760  ~475 KB
+assets/balatro-cards-optimized/jokers/jokers_25_16bit.png      178x380  ~65 KB
+
+# Chosen default profile
+Profile: 25% scale + reduced depth (16-bit target workflow)
+Reason:
+- Fits PSP texture constraints without crop risk (height below 512)
+- Smallest memory footprint
+- Preserves enough readability for preview and indexing
+
+# Final exports used by runtime verification
+assets/balatro-cards-optimized/jokers/jokers_psp.png 178x380
+assets/balatro-cards-optimized/tarots/tarots_psp.png 178x143
+
+# Render verification notes
+- Runtime loads via graphics_load_wallpaper path for stable decode on PSP target.
+- Preview drawn in menu main scene at reduced display size for readability check.

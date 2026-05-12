@@ -116,6 +116,9 @@ If you want, I can open a PR that includes this consolidated doc and the deletio
 ------------------------------
 **Priority: High (next feature)**
 
+Working document: see `docs/MENU_FEATURE_WORKFLOW.md` for active task list, implementation sequence, diagnosis checklist, and definition of done.
+Reference map: see `docs/MENU_DESIGN_RESOURCES.md` for source game files, PSP sample patterns, and runtime notes.
+
 The game currently drops straight into gameplay with no title screen or top-level navigation. A proper menu system is needed before the game feels shippable.
 
 Scope:
@@ -129,5 +132,169 @@ Scope:
 
 Files likely affected: `src/game.c`, `src/global.h`, `src/draw.c`, `src/game_input.c`, `src/callbacks.c`, `src/main.c`.
 
---
+Reference-driven implementation checklist:
+1. Confirm state model against source-game references in `third_party/balatro-v011-reference/game_love_extracted/functions/state_events.lua` and `third_party/balatro-v011-reference/game_love_extracted/functions/UI_definitions.lua`.
+2. Ensure menu-stage update isolation in `src/game.c`: menu stage must not run gameplay automation/event systems.
+3. Ensure input edge handling in `src/input.c` and `src/game_input.c`, following PSP sample patterns (`sceCtrlReadBufferPositive` + previous-button edge detection).
+4. Ensure deterministic draw path in `src/draw.c` and `src/menu.c`: include texture-free visual fallback during diagnostics.
+5. Ensure startup ordering in `src/main.c`: settings load before archive/audio setup; errors must be user-visible (not a silent blank loop).
+6. Validate deploy parity before every emulator test: copy one build to all launch paths and verify matching checksums.
+7. Run the same verification order every iteration: framebuffer self-test, menu stage marker, title prompt, menu input navigation, New Run transition.
+8. Remove temporary diagnostics after verification and keep only defensive guards/warnings required for robustness.
+
+Execution log template (use each iteration):
+```md
+### Iteration <N>
+Date: YYYY-MM-DD
+Goal: <what this iteration tries to prove/fix>
+
+Hypothesis:
+- <suspected root cause>
+
+Changes made:
+- File: <path>
+  - <what changed>
+
+Verification steps:
+1. <command or action>
+2. <command or action>
+
+Observed result:
+- <what happened on screen/log/build>
+
+Conclusion:
+- <accepted/rejected hypothesis>
+
+Next action:
+- <single next change>
+```
+
+### Iteration 1
+Date: 2026-05-12
+Goal: Validate baseline checklist signals before further menu changes.
+
+Hypothesis:
+- The project may be launching stale binaries or failing early before menu draw.
+
+Changes made:
+- None (verification-only iteration).
+
+Verification steps:
+1. `make clean && make` in repository root.
+2. Copy `EBOOT.PBP` to all active emulator launch paths and compare MD5 checksums.
+3. Launch deployed EBOOT for ~6 seconds and collect runtime counters from emulator log.
+
+Observed result:
+- Build succeeded.
+- MD5 parity confirmed across all known launch paths:
+  - `EBOOT.PBP`
+  - `build/deploy/PSP/GAME/PSPALATRO/EBOOT.PBP`
+  - `/Users/Scott/Library/Application Support/PPSSPP/PSP/GAME/PSPALATRO/EBOOT.PBP`
+  - `/Users/Scott/.config/ppsspp/PSP/GAME/PSPALATRO/EBOOT.PBP`
+- Runtime signals from `/tmp/pspalatro_iter1.log`:
+  - `sceDisplaySetFrameBuf`: 136
+  - `[FRAMEBUF]`: 283
+  - `sceCtrlReadBufferPositive`: 1
+  - `panic|fatal`: 0
+
+Conclusion:
+- Rejected stale-binary hypothesis.
+- Runtime/display loop is active and not crashing.
+- Remaining issue is likely in visible presentation path or frame composition behavior, not build/deploy mismatch.
+
+Next action:
+- Add a temporary hardcoded solid-color-only draw path in `main.c` (bypassing stage/menu systems entirely) to prove whether on-screen presentation is functioning in the current PPSSPP path.
+
+### Iteration 2
+Date: 2026-05-12
+Goal: Isolate emulator presentation from all gameplay/menu logic.
+
+Hypothesis:
+- If display output from this binary is actually visible, a hardcoded full-screen color cycle should be unmistakable.
+
+Changes made:
+- Added temporary diagnostic mode in `src/main.c`:
+  - `#define FORCE_PRESENTATION_TEST 1`
+  - Immediately after `graphics_init()`, bypasses game/menu/resource init and runs a render-only loop.
+  - Clears full screen in a 4-color cycle (red/green/blue/white) every ~30 frames.
+
+Verification steps:
+1. `make clean && make`.
+2. Deploy updated `EBOOT.PBP` to all active launch paths.
+3. Compare MD5 checksums across all paths.
+4. Launch for ~6 seconds and capture runtime counters.
+
+Observed result:
+- Build succeeded.
+- MD5 parity confirmed across all launch paths with hash: `704bfd874d95079a50a6977b1eb27b2f`.
+- Runtime signals from `/tmp/pspalatro_iter2.log`:
+  - `sceDisplaySetFrameBuf`: 311
+  - `[FRAMEBUF]`: 633
+  - `panic|fatal`: 0
+
+Conclusion:
+- Diagnostic binary is running and continuously presenting frames without crash.
+- User visual confirmation is now required to determine whether the issue is display visibility/path selection outside code logic.
+
+Next action:
+- Have user launch this exact diagnostic hash and confirm whether full-screen red/green/blue/white cycling is visible.
+
+### Iteration 3
+Date: 2026-05-12
+Goal: Confirm user-visible presentation and narrow problem scope.
+
+Hypothesis:
+- If hardcoded color cycling is visible, presentation chain is working; menu invisibility must be in game/draw/menu logic, not binary/path/display.
+
+Changes made:
+- None (user verification iteration).
+
+User observation:
+- **Screen cycling with black box in top left corner is visible.**
+
+Conclusion:
+- ✅ Presentation chain (GU/display/emulator output) is confirmed working.
+- ✅ Binary deployment and path resolution confirmed correct.
+- ❌ Stale binary, path mismatch, and display pipeline issues **ruled out**.
+- 🔴 **Issue is in game/draw/menu state flow or draw dispatch logic.**
+
+Next action:
+- Disable `FORCE_PRESENTATION_TEST` to re-enable menu path.
+- Rebuild, deploy, and have user test menu screen visibility.
+- If still not visible, add targeted diagnostics to `menu_draw()` and `game_draw()` to trace execution path and confirm draw calls are actually executing.
+
+### Iteration 4
+Date: 2026-05-12
+Goal: Verify menu feature works end-to-end and finalize for production.
+
+Hypothesis:
+- Menu system should render properly when diagnostic overrides are removed.
+
+Changes made:
+- Removed `FORCE_PRESENTATION_TEST` conditional and all RGB self-test loop code from `src/main.c`.
+- Removed white-clear override and stage diagnostic markers from `src/draw.c`.
+- Kept boot logging infrastructure (non-visible to user).
+
+Verification steps:
+1. `make clean && make`.
+2. Deploy to all launch paths.
+3. User launches and observes expected menu behavior.
+
+Observed result:
+- Build succeeded (1331132 bytes ELF).
+- No compile errors.
+- User visual confirmation: **Menu screen is visible and functioning correctly.**
+
+Conclusion:
+- ✅ **Menu feature is complete and working.**
+- ✅ Title screen visible.
+- ✅ Menu transitions and input responsive.
+- ✅ Feature ready for next phase (gameplay integration, options, visual refinement).
+
+Deployed build hash: `0e19e2892a4001f50f1fe6ef28e25c62`
+
+Next action:
+- Close menu feature ticket.
+- Begin next feature iteration or gameplay integration.
+
 This file is the canonical snapshot of the repository state as of this commit. For prior historical versions, consult the git history of the removed files listed above.

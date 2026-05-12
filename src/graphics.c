@@ -1,4 +1,5 @@
 #include "global.h"
+#include <pspiofilemgr.h>
 #define STBI_NO_THREAD_LOCALS
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -31,6 +32,8 @@ struct Texture
     bool in_use;
     int width;
     int height;
+    int content_width;
+    int content_height;
     uint8_t *data;
     int format;
     int bytes_per_pixel;
@@ -54,6 +57,49 @@ struct Font g_fonts[MAX_FONTS];
 int g_font_count = 0;
 
 int g_allocated_graphic_bytes = 0;
+
+static bool graphics_try_load_image_from_path(const char *path, struct Image *image)
+{
+    image->data = stbi_load(path, &image->w, &image->h, &image->channels, 4);
+    if (image->data != NULL)
+    {
+        return true;
+    }
+
+    SceUID fd = sceIoOpen(path, PSP_O_RDONLY, 0777);
+    if (fd < 0)
+    {
+        return false;
+    }
+
+    int file_size = sceIoLseek32(fd, 0, PSP_SEEK_END);
+    if (file_size <= 0)
+    {
+        sceIoClose(fd);
+        return false;
+    }
+
+    sceIoLseek32(fd, 0, PSP_SEEK_SET);
+    uint8_t *buffer = (uint8_t *)malloc(file_size);
+    if (buffer == NULL)
+    {
+        sceIoClose(fd);
+        return false;
+    }
+
+    int bytes_read = sceIoRead(fd, buffer, file_size);
+    sceIoClose(fd);
+    if (bytes_read != file_size)
+    {
+        free(buffer);
+        return false;
+    }
+
+    image->data = stbi_load_from_memory(buffer, file_size, &image->w, &image->h, &image->channels, 4);
+    free(buffer);
+
+    return image->data != NULL;
+}
 
 #define GU_START()   sceGuStart(GU_DIRECT, g_draw_list); g_vertex_array_pos = 0; g_quad_vertices = g_vertex_array; // printf("GU_START\n");
 #define GU_FINISH()  sceGuFinish(); sceGuSync(0,0); // printf("GU_FINISH\n");
@@ -104,7 +150,7 @@ const unsigned char font_small_data[] = {
     0x82, 0x28, 0xA2, 0x8A, 0x08, 0x22, 0x88, 0x89, 0x22, 0x82, 0x28, 0xA2,
     0x72, 0x2F, 0x1C, 0xF3, 0xE8, 0x1C, 0x89, 0xC6, 0x22, 0xFA, 0x28, 0x9C,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0xF1, 0xCF, 0x1C, 0xFA, 0x28, 0xA2, 0x8A, 0x2F, 0x9C, 0x81, 0xC7, 0x00,
     0x8A, 0x28, 0xA0, 0x22, 0x28, 0xA2, 0x51, 0x41, 0x10, 0xC0, 0x4D, 0x80,
     0x8A, 0x28, 0x9C, 0x22, 0x28, 0xA2, 0x20, 0x82, 0x10, 0x60, 0x40, 0x00,
@@ -260,7 +306,7 @@ const unsigned char font_big_data[] = {
     0x20, 0x3C, 0x24, 0x42, 0x08, 0x42, 0x14, 0x49, 0x22, 0x08, 0x21, 0x40,
     0x04, 0x08, 0x00, 0x00, 0x70, 0x03, 0x72, 0x3C, 0x1C, 0x3C, 0x08, 0x36,
     0x41, 0x1C, 0x7F, 0x78, 0x02, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF,
     0x10, 0x00, 0x60, 0x00, 0x06, 0x00, 0x0C, 0x00, 0x60, 0x10, 0x02, 0x60,
     0x30, 0x00, 0x00, 0x00, 0x10, 0x00, 0x20, 0x00, 0x02, 0x00, 0x12, 0x00,
     0x20, 0x00, 0x00, 0x20, 0x10, 0x00, 0x00, 0x00, 0x08, 0x3C, 0x20, 0x3C,
@@ -449,12 +495,26 @@ int get_closest_power_of_2(int x)
 
 struct Image graphics_load_image_from_archive(const char *filename)
 {
-    struct Image image;
+    /* Allow local overrides first so custom art can be tested without repacking game.love. */
+    struct Image image = graphics_load_image(filename);
+    if (image.data != NULL)
+    {
+        char str[64];
+        snprintf(str, sizeof(str), "Override: \"%s\"", filename);
+        DEBUG_PRINTF("[TEX] Loaded from local override: %s\n", filename);
+        game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
+        return image;
+    }
+
     image.data = NULL;
+    image.w = 0;
+    image.h = 0;
+    image.channels = 0;
 
     size_t file_size;
     char str[64];
-    sprintf(str, "Loading \"%s\" from archive", filename);
+    snprintf(str, sizeof(str), "Archive: \"%s\"", filename);
+    DEBUG_PRINTF("[TEX] Loading from archive: %s\n", filename);
     game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
     uint8_t *buffer = archive_load_file_entry(filename, &file_size);
     if (buffer == NULL)
@@ -478,13 +538,57 @@ struct Image graphics_load_image_from_archive(const char *filename)
 struct Image graphics_load_image(const char *filename)
 {
     struct Image image;
+    image.data = NULL;
+    image.w = 0;
+    image.h = 0;
+    image.channels = 0;
 
-    image.data = stbi_load(filename, &image.w, &image.h, &image.channels, 4);
-    if (image.data == NULL) return image;
-    g_allocated_graphic_bytes += image.w * image.h * image.channels;
-    DEBUG_PRINTF("Loaded image %s with size %dx%d\n", filename, image.w, image.h);
-    DEBUG_PRINTF("Allocated graphics: %d\n", g_allocated_graphic_bytes);
+    // Try multiple path formats to handle both dev and PSP environments.
+    // Keep local override folders early so user-provided assets win over archive content.
+    char attempts[30][256] = {{0}};
+    int attempt_count = 0;
 
+    // Direct and relative paths
+    snprintf(attempts[attempt_count++], 256, "%s", filename);
+    snprintf(attempts[attempt_count++], 256, "./%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../../%s", filename);
+
+    // Local asset override folders in repo/deploy layout
+    snprintf(attempts[attempt_count++], 256, "assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "assets/out/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../assets/out/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../../assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../../assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "../../assets/out/assets/%s", filename);
+
+    // PSP filesystem paths
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/./%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/%s", filename);
+
+    // PSP-local override folders
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/assets/out/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/assets/out/assets/%s", filename);
+
+    for (int i = 0; i < attempt_count; i++)
+    {
+        if (graphics_try_load_image_from_path(attempts[i], &image))
+        {
+            g_allocated_graphic_bytes += image.w * image.h * image.channels;
+            DEBUG_PRINTF("[TEX] Loaded %s from path[%d]: %s (%dx%d)\n", filename, i, attempts[i], image.w, image.h);
+            return image;
+        }
+    }
+
+    DEBUG_PRINTF("[TEX] FAILED to load %s from all %d paths\n", filename, attempt_count);
     return image;
 }
 
@@ -513,8 +617,16 @@ int graphics_load_texture_from_image(struct Image *loaded_image, int start_x, in
 
     uint8_t *image = NULL;
 
-    int desired_width = get_closest_power_of_2(loaded_image->w - start_x);
-    int desired_height = get_closest_power_of_2(loaded_image->h - start_y);
+    int source_width = loaded_image->w - start_x;
+    int source_height = loaded_image->h - start_y;
+    int desired_width = get_closest_power_of_2(source_width);
+    int desired_height = get_closest_power_of_2(source_height);
+
+    if (source_width > desired_width || source_height > desired_height)
+    {
+        DEBUG_PRINTF("[TEX][WARN] Source image %dx%d exceeds PSP texture budget, cropping to %dx%d\n",
+                     source_width, source_height, desired_width, desired_height);
+    }
 
     int real_height = (loaded_image->h - start_y) < desired_height ? (loaded_image->h - start_y) : desired_height;
 
@@ -553,6 +665,8 @@ int graphics_load_texture_from_image(struct Image *loaded_image, int start_x, in
     g_textures[texture_slot].in_use = true;
     g_textures[texture_slot].width = desired_width;
     g_textures[texture_slot].height = desired_height;
+    g_textures[texture_slot].content_width = MIN(source_width, desired_width);
+    g_textures[texture_slot].content_height = MIN(source_height, desired_height);
     g_textures[texture_slot].data = image_swizzled;
     g_textures[texture_slot].format = GU_PSM_8888;
     g_textures[texture_slot].bytes_per_pixel = 4;
@@ -606,8 +720,16 @@ int graphics_load_texture_from_image_16bit(struct Image *loaded_image, int start
 
     uint8_t *image = NULL;
 
-    int desired_width = get_closest_power_of_2(loaded_image->w - start_x);
-    int desired_height = get_closest_power_of_2(loaded_image->h - start_y);
+    int source_width = loaded_image->w - start_x;
+    int source_height = loaded_image->h - start_y;
+    int desired_width = get_closest_power_of_2(source_width);
+    int desired_height = get_closest_power_of_2(source_height);
+
+    if (source_width > desired_width || source_height > desired_height)
+    {
+        DEBUG_PRINTF("[TEX][WARN] Source image %dx%d exceeds PSP texture budget, cropping to %dx%d\n",
+                     source_width, source_height, desired_width, desired_height);
+    }
 
     int real_height = (loaded_image->h - start_y) < desired_height ? (loaded_image->h - start_y) : desired_height;
 
@@ -646,6 +768,8 @@ int graphics_load_texture_from_image_16bit(struct Image *loaded_image, int start
     g_textures[texture_slot].in_use = true;
     g_textures[texture_slot].width = desired_width;
     g_textures[texture_slot].height = desired_height;
+    g_textures[texture_slot].content_width = MIN(source_width, desired_width);
+    g_textures[texture_slot].content_height = MIN(source_height, desired_height);
     g_textures[texture_slot].data = image_swizzled;
     g_textures[texture_slot].format = GU_PSM_4444;
     g_textures[texture_slot].bytes_per_pixel = 2;
@@ -730,10 +854,15 @@ int graphics_load_texture_16bit(const char *filename, int start_x, int start_y)
     struct Image image = graphics_load_image(filename);
     if (image.data == NULL)
     {
-        char str[64];
-        sprintf(str, "Error loading \"%s\"", filename);
-        game_draw_loading_text(str, COLOR_TEXT_RED, COLOR_BLACK);
-        return -1;
+        DEBUG_PRINTF("[TEX] Local load failed for %s, trying archive fallback.\n", filename);
+        image = graphics_load_image_from_archive(filename);
+        if (image.data == NULL)
+        {
+            char str[64];
+            sprintf(str, "Error loading \"%s\"", filename);
+            game_draw_loading_text(str, COLOR_TEXT_RED, COLOR_BLACK);
+            return -1;
+        }
     }
     int texture_slot = graphics_load_texture_from_image_16bit(&image, start_x, start_y);
     graphics_destroy_image(&image);
@@ -1262,4 +1391,38 @@ void graphics_unset_offscreen_render_target()
 	sceGuEnable(GU_SCISSOR_TEST);
 
     GU_FINISH();    
+}
+
+// Function to load wallpaper texture
+int graphics_load_wallpaper(const char *filename) {
+    struct Image image = graphics_load_image(filename);
+    if (image.data == NULL)
+    {
+        DEBUG_PRINTF("[WALLPAPER] local load failed for %s\n", filename);
+        return -1;
+    }
+
+    /* Use 32-bit for wallpapers to preserve gradients/details in full-screen backgrounds. */
+    int texture = graphics_load_texture_from_image(&image, 0, 0);
+    graphics_destroy_image(&image);
+    return texture;
+}
+
+bool graphics_get_texture_content_size(int texture, int *out_width, int *out_height)
+{
+    if (texture < 0 || texture >= MAX_TEXTURES || !g_textures[texture].in_use)
+    {
+        return false;
+    }
+
+    if (out_width != NULL)
+    {
+        *out_width = g_textures[texture].content_width;
+    }
+    if (out_height != NULL)
+    {
+        *out_height = g_textures[texture].content_height;
+    }
+
+    return true;
 }

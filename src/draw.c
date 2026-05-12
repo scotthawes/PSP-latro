@@ -1927,54 +1927,34 @@ void game_draw_debug_info()
 
 void game_draw()
 {
+    DEBUG_PRINTF("[DRAW] enter game_draw\n");
     graphics_begin_draw();
-
-    if (g_game_state.stage == GAME_STAGE_MENU)
-    {
-        graphics_clear(COLOR_WHITE);
-    }
-    else
-    {
-        graphics_clear(COLOR_BACKGROUND_2);
-    }
-
-    // Stage diagnostic markers (texture-free, always visible if render path is alive).
-    graphics_set_no_texture();
-    if (g_game_state.stage == GAME_STAGE_MENU)
-    {
-        // Red marker: menu stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_RED);
-    }
-    else if (g_game_state.stage == GAME_STAGE_BLINDS)
-    {
-        // Green marker: blinds stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_GREEN);
-    }
-    else if (g_game_state.stage == GAME_STAGE_INGAME)
-    {
-        // Blue marker: ingame stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_BLUE);
-    }
-    else if (g_game_state.stage == GAME_STAGE_SHOP)
-    {
-        // Yellow marker: shop stage
-        graphics_draw_quad(0, 0, 26, 26, 0, 0, 0, 0, COLOR_YELLOW);
-    }
+    DEBUG_PRINTF("[DRAW] after graphics_begin_draw\n");
+    graphics_clear(COLOR_BACKGROUND_2);
+    DEBUG_PRINTF("[DRAW] after graphics_clear\n");
 
     switch (g_game_state.stage)
     {
         case GAME_STAGE_MENU:
+            DEBUG_PRINTF("[DRAW] menu_draw start\n");
             menu_draw();
+            DEBUG_PRINTF("[DRAW] menu_draw end\n");
             break;
         case GAME_STAGE_BLINDS:
+            DEBUG_PRINTF("[DRAW] game_draw_blind_select start\n");
             game_draw_blind_select();            
+            DEBUG_PRINTF("[DRAW] game_draw_blind_select end\n");
             break;
         case GAME_STAGE_INGAME:
+            DEBUG_PRINTF("[DRAW] game_draw_ingame start\n");
             game_draw_ingame();
+            DEBUG_PRINTF("[DRAW] game_draw_ingame end\n");
             break;
         case GAME_STAGE_SHOP:
         {
+            DEBUG_PRINTF("[DRAW] game_draw_shop start\n");
             game_draw_shop();
+            DEBUG_PRINTF("[DRAW] game_draw_shop end\n");
             break;
         }
     }
@@ -1990,6 +1970,8 @@ void game_draw()
     }
 
     game_draw_debug_info();
+    DEBUG_PRINTF("[DRAW] before graphics_end_draw\n");
 
     graphics_end_draw();
+    DEBUG_PRINTF("[DRAW] after graphics_end_draw\n");
 }

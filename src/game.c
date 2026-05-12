@@ -14,7 +14,8 @@ struct Settings g_settings = {
     true,
     false,
     2,
-    1
+    1,
+    0
 };
 
 struct GameState g_game_state;
@@ -1471,12 +1472,78 @@ void game_init_full_deck()
 
 void game_start_shop(bool init);
 
+static char g_settings_file_path[256] = "settings.ini";
+
+static bool game_resolve_settings_path_for_read(char *out_path, size_t out_path_size)
+{
+    const char *candidates[] = {
+        "ms0:/PSP/GAME/PSPALATRO/settings.ini",
+        "ms0:/PSP/GAME/PSPALATRO/./settings.ini",
+        "/PSP/GAME/PSPALATRO/settings.ini",
+        "settings.ini",
+        "./settings.ini",
+        "../settings.ini",
+        "assets/settings.ini"
+    };
+
+    for (int i = 0; i < (int)(sizeof(candidates) / sizeof(candidates[0])); i++)
+    {
+        FILE *f = fopen(candidates[i], "r");
+        if (f)
+        {
+            fclose(f);
+            snprintf(out_path, out_path_size, "%s", candidates[i]);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool game_resolve_settings_path_for_write(char *out_path, size_t out_path_size)
+{
+    const char *candidates[] = {
+        g_settings_file_path,
+        "ms0:/PSP/GAME/PSPALATRO/settings.ini",
+        "ms0:/PSP/GAME/PSPALATRO/./settings.ini",
+        "/PSP/GAME/PSPALATRO/settings.ini",
+        "settings.ini",
+        "./settings.ini",
+        "assets/settings.ini"
+    };
+
+    for (int i = 0; i < (int)(sizeof(candidates) / sizeof(candidates[0])); i++)
+    {
+        if (candidates[i] == NULL || candidates[i][0] == '\0')
+        {
+            continue;
+        }
+
+        FILE *f = fopen(candidates[i], "a");
+        if (f)
+        {
+            fclose(f);
+            snprintf(out_path, out_path_size, "%s", candidates[i]);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool game_init_load_file_values()
 {
     char buffer[128];
+    char settings_path[256];
 
     game_draw_loading_text("Loading \"settings.ini\"", COLOR_WHITE, COLOR_BLACK);
-    if (!ini_open("settings.ini"))
+    if (!game_resolve_settings_path_for_read(settings_path, sizeof(settings_path)))
+    {
+        game_draw_loading_text("Could not open \"settings.ini\"", COLOR_TEXT_YELLOW, COLOR_BLACK);
+        return true;
+    }
+
+    if (!ini_open(settings_path))
     {
         game_draw_loading_text("Could not open \"settings.ini\"", COLOR_TEXT_YELLOW, COLOR_BLACK);
         return true;
@@ -1583,6 +1650,13 @@ bool game_init_load_file_values()
                 int value = atoi(buffer);
                 g_settings.speed = CLAMP(value, 1, 5);
             }
+            else if (!strcmp(buffer, "wallpaper_variant"))
+            {
+                token_type = ini_read_token(buffer, 128);
+                if (token_type != INI_TOKEN_VALUE) return false;
+                int value = atoi(buffer);
+                g_settings.wallpaper_variant = CLAMP(value, 0, 1);
+            }
         }
         else if (token_type == INI_TOKEN_ERROR)
         {
@@ -1592,7 +1666,43 @@ bool game_init_load_file_values()
     } while (token_type != INI_TOKEN_EOF);
 
     ini_close();
+    snprintf(g_settings_file_path, sizeof(g_settings_file_path), "%s", settings_path);
 
+    return true;
+}
+
+bool game_save_file_values()
+{
+    char settings_path[256];
+    if (!game_resolve_settings_path_for_write(settings_path, sizeof(settings_path)))
+    {
+        return false;
+    }
+
+    FILE *f = fopen(settings_path, "w");
+    if (f == NULL)
+    {
+        return false;
+    }
+
+    fprintf(f, "archive_file_name = %s\n", g_settings.archive_file_name);
+    fprintf(f, "hand_size = %d\n", g_settings.hand_size);
+    fprintf(f, "hands = %d\n", g_settings.hands);
+    fprintf(f, "discards = %d\n", g_settings.discards);
+    fprintf(f, "wealth = %d\n", g_settings.wealth);
+    fprintf(f, "joker_slots = %d\n", g_settings.joker_slots);
+    fprintf(f, "consumable_slots = %d\n", g_settings.consumable_slots);
+    fprintf(f, "shop_item_slots = %d\n", g_settings.shop_item_slots);
+    fprintf(f, "shop_booster_slots = %d\n", g_settings.shop_booster_slots);
+    fprintf(f, "audio = %s\n", g_settings.audio ? "true" : "false");
+    fprintf(f, "move_cards = %s\n", g_settings.move_cards ? "true" : "false");
+    fprintf(f, "overclock = %s\n", g_settings.overclock ? "true" : "false");
+    fprintf(f, "speed = %d\n", g_settings.speed);
+    fprintf(f, "ante_score_scaling = %d\n", g_settings.ante_score_scaling);
+    fprintf(f, "wallpaper_variant = %d\n", g_settings.wallpaper_variant);
+
+    fclose(f);
+    snprintf(g_settings_file_path, sizeof(g_settings_file_path), "%s", settings_path);
     return true;
 }
 
@@ -2096,6 +2206,13 @@ uint32_t g_game_counter = 0;
 
 void game_update()
 {
+    if (g_game_state.stage == GAME_STAGE_MENU)
+    {
+        game_input_update(false);
+        g_game_counter++;
+        return;
+    }
+
     bool no_input = automated_event_run();
     event_run();
 

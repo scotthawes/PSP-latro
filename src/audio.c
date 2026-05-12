@@ -580,17 +580,15 @@ int audio_load_ogg(char *filename)
 
 #ifdef DEBUG    
     {
-        DEBUG_PRINTF("[AUDIO] Ogg file loaded: \"%s\" (%ld bytes)\n", filename, fsize);
-
-        char **ptr=ov_comment(&(g_ogg_files[0].vorbis_file),-1)->user_comments;
-        vorbis_info *vi=ov_info(&(g_ogg_files[0].vorbis_file),-1);
-        while(*ptr){
-          DEBUG_PRINTF("\t%s\n",*ptr);
-          ++ptr;
+        vorbis_info *vi = ov_info(&(g_ogg_files[0].vorbis_file), -1);
+        if (vi)
+        {
+            DEBUG_PRINTF("[AUDIO] Ogg file loaded: \"%s\" (%ld bytes, %d ch @ %ld Hz)\n", filename, fsize, vi->channels, vi->rate);
         }
-        DEBUG_PRINTF("\tBitstream: %d channels, %ld Hz\n",vi->channels,vi->rate);
-        DEBUG_PRINTF("\tDecoded length: %ld samples\n", (long)ov_pcm_total(&(g_ogg_files[0].vorbis_file),-1));
-        DEBUG_PRINTF("\tEncoded by: %s\n",ov_comment(&(g_ogg_files[0].vorbis_file),-1)->vendor);
+        else
+        {
+            DEBUG_PRINTF("[AUDIO] Ogg file loaded: \"%s\" (%ld bytes)\n", filename, fsize);
+        }
     }
 #endif
 
@@ -639,17 +637,15 @@ int audio_load_ogg_from_archive(char *filename)
 
 #ifdef DEBUG    
     {
-        DEBUG_PRINTF("[AUDIO] Ogg file loaded from archive: \"%s\" (%zu bytes)\n", filename, file_size);
-
-        char **ptr=ov_comment(&(g_ogg_files[0].vorbis_file),-1)->user_comments;
-        vorbis_info *vi=ov_info(&(g_ogg_files[0].vorbis_file),-1);
-        while(*ptr){
-          DEBUG_PRINTF("\t%s\n",*ptr);
-          ++ptr;
+        vorbis_info *vi = ov_info(&(g_ogg_files[0].vorbis_file), -1);
+        if (vi)
+        {
+            DEBUG_PRINTF("[AUDIO] Ogg file loaded from archive: \"%s\" (%zu bytes, %d ch @ %ld Hz)\n", filename, file_size, vi->channels, vi->rate);
         }
-        DEBUG_PRINTF("\tBitstream: %d channels, %ld Hz\n",vi->channels,vi->rate);
-        DEBUG_PRINTF("\tDecoded length: %ld samples\n", (long)ov_pcm_total(&(g_ogg_files[0].vorbis_file),-1));
-        DEBUG_PRINTF("\tEncoded by: %s\n",ov_comment(&(g_ogg_files[0].vorbis_file),-1)->vendor);
+        else
+        {
+            DEBUG_PRINTF("[AUDIO] Ogg file loaded from archive: \"%s\" (%zu bytes)\n", filename, file_size);
+        }
     }
 #endif
 
@@ -708,5 +704,15 @@ void audio_destroy_ogg(int ogg_id)
     free(g_ogg_files[ogg_id].file_ptr);
     g_ogg_files[ogg_id].in_use = false;
 }
+
+#ifdef DEBUG
+/*
+ * audio.c temporarily routes DEBUG_PRINTF through audio_debug_printf.
+ * Restore the default DEBUG_PRINTF macro for files included after audio.c
+ * in the unity build (main.c includes multiple .c files directly).
+ */
+#undef DEBUG_PRINTF
+#define DEBUG_PRINTF(...) printf(__VA_ARGS__)
+#endif
 
 

@@ -79,3 +79,36 @@ The `settings.ini` file can have the following entries:
 - overclock (boolean) - set the CPU and BUS clocks to 333Mhz, which I believe it to be fine for the PSP, it may however drain the battery faster
 - ante_score_scaling (int) - how the ante score scales (values from 1 to 3)
 - speed (int) - how fast scoring is (values from 1 to 5)
+
+## PSP Image Guidelines
+
+When adding or replacing images (especially menu wallpapers), follow these PSP-focused rules:
+
+1. Prefer 480x272 for full-screen menu backgrounds.
+2. Keep source dimensions at or under 512 in each axis.
+3. Use PNG assets with straightforward alpha (or opaque RGB if no transparency is needed).
+4. Expect power-of-two texture buffers internally; non-power-of-two images are padded.
+5. Very large images can be cropped to fit PSP texture budget.
+
+### Wallpaper Files
+
+Menu wallpapers are loaded from:
+
+- `assets/wallpapers/title_wallpaper.png`
+- `assets/wallpapers/title_wallpaper_b.png`
+- `assets/wallpapers/main_menu_wallpaper.png`
+- `assets/wallpapers/main_menu_wallpaper_b.png`
+
+### Debugging Image Issues
+
+In `DEBUG` builds, texture and wallpaper diagnostics are printed:
+
+- `[WALLPAPER] trying|loaded|failed` for wallpaper candidate loading.
+- `[TEX][WARN] Source image ... exceeds PSP texture budget...` when an image is too large and will be cropped.
+- `[TEX] Loaded ...` and `[TEX] Loading from archive...` for source path visibility.
+
+If an image does not appear:
+
+1. Confirm dimensions are PSP-safe (ideally 480x272 for full-screen backgrounds).
+2. Check logs for `[WALLPAPER] loaded` and `[TEX][WARN]`.
+3. Ensure you are launching the latest `build/EBOOT.PBP` after rebuild.
