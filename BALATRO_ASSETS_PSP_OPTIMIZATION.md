@@ -1,6 +1,6 @@
 # Balatro Assets PSP Optimization Plan
 
-**Status**: Planning  
+**Status**: Complete / Handoff  
 **Date**: 12 May 2026  
 **Goal**: Adapt PC game assets to PSP hardware constraints
 
@@ -33,6 +33,11 @@ Evidence format (append under milestone task when tested):
 - Log: <loaded from path[n] ...>
 - Visual: Pass/Fail
 - Notes: <artifact quality issues, scaling artifacts, color banding, etc.>
+
+### Handoff Notes
+- Runtime verification hooks have been removed from `src/menu.c`; only the permanent asset integrations remain.
+- The optimized asset folders are synced into `build/assets/` by the Makefile and are ready for normal development use.
+- All checklist milestones are complete; any future asset work should start from the stable runtime code path.
 
 #### Milestone 1: UI and Branding (Fast Win)
 - [x] Create output folders: assets/balatro-ui-optimized/icons and assets/balatro-ui-optimized/buttons
