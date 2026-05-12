@@ -1402,7 +1402,8 @@ int graphics_load_wallpaper(const char *filename) {
         return -1;
     }
 
-    int texture = graphics_load_texture_from_image_16bit(&image, 0, 0);
+    /* Use 32-bit for wallpapers to preserve gradients/details in full-screen backgrounds. */
+    int texture = graphics_load_texture_from_image(&image, 0, 0);
     graphics_destroy_image(&image);
     return texture;
 }

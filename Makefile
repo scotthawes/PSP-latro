@@ -30,10 +30,11 @@ all: sync_build_artifacts
 
 sync_build_artifacts: EBOOT.PBP
 	@mkdir -p build
-	@mkdir -p build/assets/wallpapers
+	@mkdir -p build/assets
 	@cp EBOOT.PBP build/EBOOT.PBP
 	@cp assets/out/assets/editions.png build/ 2>/dev/null || true
-	@cp assets/wallpapers/*.png build/assets/wallpapers/ 2>/dev/null || true
+	@cp -r assets/wallpapers build/assets/ 2>/dev/null || true
+	@cp -r assets/backgrounds build/assets/ 2>/dev/null || true
 	@cp settings.ini build/ 2>/dev/null || true
 	@echo "Synced build/EBOOT.PBP and local runtime assets."
 
