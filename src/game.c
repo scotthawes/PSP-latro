@@ -14,7 +14,8 @@ struct Settings g_settings = {
     true,
     false,
     2,
-    1
+    1,
+    0
 };
 
 struct GameState g_game_state;
@@ -1583,6 +1584,13 @@ bool game_init_load_file_values()
                 int value = atoi(buffer);
                 g_settings.speed = CLAMP(value, 1, 5);
             }
+            else if (!strcmp(buffer, "wallpaper_variant"))
+            {
+                token_type = ini_read_token(buffer, 128);
+                if (token_type != INI_TOKEN_VALUE) return false;
+                int value = atoi(buffer);
+                g_settings.wallpaper_variant = CLAMP(value, 0, 1);
+            }
         }
         else if (token_type == INI_TOKEN_ERROR)
         {
@@ -1593,6 +1601,34 @@ bool game_init_load_file_values()
 
     ini_close();
 
+    return true;
+}
+
+bool game_save_file_values()
+{
+    FILE *f = fopen("settings.ini", "w");
+    if (f == NULL)
+    {
+        return false;
+    }
+
+    fprintf(f, "archive_file_name = %s\n", g_settings.archive_file_name);
+    fprintf(f, "hand_size = %d\n", g_settings.hand_size);
+    fprintf(f, "hands = %d\n", g_settings.hands);
+    fprintf(f, "discards = %d\n", g_settings.discards);
+    fprintf(f, "wealth = %d\n", g_settings.wealth);
+    fprintf(f, "joker_slots = %d\n", g_settings.joker_slots);
+    fprintf(f, "consumable_slots = %d\n", g_settings.consumable_slots);
+    fprintf(f, "shop_item_slots = %d\n", g_settings.shop_item_slots);
+    fprintf(f, "shop_booster_slots = %d\n", g_settings.shop_booster_slots);
+    fprintf(f, "audio = %s\n", g_settings.audio ? "true" : "false");
+    fprintf(f, "move_cards = %s\n", g_settings.move_cards ? "true" : "false");
+    fprintf(f, "overclock = %s\n", g_settings.overclock ? "true" : "false");
+    fprintf(f, "speed = %d\n", g_settings.speed);
+    fprintf(f, "ante_score_scaling = %d\n", g_settings.ante_score_scaling);
+    fprintf(f, "wallpaper_variant = %d\n", g_settings.wallpaper_variant);
+
+    fclose(f);
     return true;
 }
 

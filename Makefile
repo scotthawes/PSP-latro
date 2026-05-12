@@ -25,3 +25,13 @@ PSP_EBOOT_PIC1 = media/pspalatro_pic.png
 
 include $(PSPSDK)/lib/build.mak
 
+# Deploy assets to build directory for PSP runtime
+install: EBOOT.PBP
+	@mkdir -p build/deploy/PSP/GAME/PSPALATRO
+	@cp EBOOT.PBP build/deploy/PSP/GAME/PSPALATRO/
+	@cp -r assets build/deploy/PSP/GAME/PSPALATRO/ 2>/dev/null || true
+	@cp settings.ini build/deploy/PSP/GAME/PSPALATRO/ 2>/dev/null || true
+	@echo "Deploy complete to build/deploy/PSP/GAME/PSPALATRO/"
+
+.PHONY: install
+

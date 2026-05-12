@@ -59,6 +59,7 @@ struct Settings
     bool overclock;
     int ante_score_scaling;
     int speed;
+    int wallpaper_variant;
 };
 
 extern struct Settings g_settings;
@@ -866,6 +867,7 @@ void automated_event_pop();
 bool automated_event_run();
 
 bool game_init_load_file_values();
+bool game_save_file_values();
 
 double game_get_ante_base_score();
 double game_get_current_blind_score();
@@ -1092,6 +1094,7 @@ int graphics_load_texture_from_archive(const char *filename, int start_x, int st
 int graphics_load_texture_from_archive_16bit(const char *filename, int start_x, int start_y);
 int graphics_load_texture(const char *filename, int start_x, int start_y);
 int graphics_load_texture_16bit(const char *filename, int start_x, int start_y);
+int graphics_load_wallpaper(const char *filename);
 void graphics_destroy_texture(int texture);
 int graphics_load_font(const char *filename, int width, int height, int length_x, int length_y);
 void graphics_destroy_font(int font);
