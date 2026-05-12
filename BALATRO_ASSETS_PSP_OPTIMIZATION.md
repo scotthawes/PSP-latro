@@ -14,19 +14,19 @@
 - [x] Converted background.jpg to PSP-safe 480x272 PNG (assets/backgrounds/balatro_bg_alt.png)
 - [x] Verified background loads in runtime logs
 - [x] Create PSP-optimized UI/logo output set
-- [ ] Create PSP-optimized card sprites output set
-- [ ] Create PSP-optimized effects output set
-- [ ] Integrate optimized assets into runtime code paths
-- [ ] Verify visual quality and memory behavior in PPSSPP
+- [x] Create PSP-optimized card sprites output set
+- [x] Create PSP-optimized effects output set
+- [x] Integrate optimized assets into runtime code paths
+- [x] Verify visual quality and memory behavior in PPSSPP
 
 ### Workboard (Methodical Order)
 
 ### Mandatory Render Verification (Required For Every Asset Batch)
-- [ ] Build and sync after asset creation (`make clean && make -j4`)
-- [ ] Execute PPSSPP using `build/EBOOT.PBP`
-- [ ] Confirm new asset path appears in texture load logs
-- [ ] Confirm visual render in menu/game scene (not just load success)
-- [ ] Record pass/fail evidence in this checklist before closing task
+- [x] Build and sync after asset creation (`make clean && make -j4`)
+- [x] Execute PPSSPP using `build/EBOOT.PBP`
+- [x] Confirm new asset path appears in texture load logs
+- [x] Confirm visual render in menu/game scene (not just load success)
+- [x] Record pass/fail evidence in this checklist before closing task
 
 Evidence format (append under milestone task when tested):
 - Asset: <asset path>
@@ -86,36 +86,44 @@ Verification evidence:
 - Notes: both optimized card sheets loaded from build/assets and rendered in title preview.
 
 #### Milestone 3: Effects and Supplemental Art
-- [ ] Create output folder: assets/balatro-effects-optimized
-- [ ] Optimize Enhancers.png, boosters.png, BlindChips.png with selected profile
-- [ ] Extract any required individual effect sprites if sheet-only approach is unclear
-- [ ] Write effects_meta.txt with sprite notes
-- [ ] Render-verify at least one effect asset in PPSSPP and capture evidence
+- [x] Create output folder: assets/balatro-effects-optimized
+- [x] Optimize Enhancers.png, boosters.png, BlindChips.png with selected profile
+- [x] Extract any required individual effect sprites if sheet-only approach is unclear
+- [x] Write effects_meta.txt with sprite notes
+- [x] Render-verify at least one effect asset in PPSSPP and capture evidence
 
 Acceptance criteria:
-- [ ] Effects look acceptable at PSP scale
-- [ ] No obvious texture budget warnings during load
-- [ ] Visual verification completed in live PSP/PPSSPP render path
+- [x] Effects look acceptable at PSP scale
+- [x] No obvious texture budget warnings during load
+- [x] Visual verification completed in live PSP/PPSSP render path
+
+Verification evidence:
+- Asset: assets/balatro-effects-optimized/enhancers_psp.png
+- Log: [TEX] Loaded balatro-effects-optimized/enhancers_psp.png from path[4]: assets/balatro-effects-optimized/enhancers_psp.png (124x119)
+- Log: [ASSET_VERIFY] loaded texture: balatro-effects-optimized/enhancers_psp.png (texture=28)
+- Draw: [ASSET_VERIFY] drawing effect preview in title scene effect_tex=28
+- Visual: Pass
+- Notes: Enhancers preview rendered cleanly alongside title/menu previews.
 
 #### Milestone 4: Integration and Validation
-- [ ] Add/adjust runtime references to point at optimized assets
-- [ ] Ensure Makefile sync copies optimized folders to build/assets
-- [ ] Run clean build
-- [ ] Launch PPSSPP and capture texture load logs
-- [ ] Confirm no regressions in menu flow or wallpaper behavior
-- [ ] Confirm integrated optimized assets visually render in their intended scene/state
+- [x] Add/adjust runtime references to point at optimized assets
+- [x] Ensure Makefile sync copies optimized folders to build/assets
+- [x] Run clean build
+- [x] Launch PPSSPP and capture texture load logs
+- [x] Confirm no regressions in menu flow or wallpaper behavior
+- [x] Confirm integrated optimized assets visually render in their intended scene/state
 
 Acceptance criteria:
-- [ ] Build succeeds
-- [ ] Assets resolve from expected paths
-- [ ] No startup hang/regression introduced
+- [x] Build succeeds
+- [x] Assets resolve from expected paths
+- [x] No startup hang/regression introduced
 
 ### Definition of Done (Project-Level)
-- [ ] All targeted optimized folders exist under assets/
-- [ ] Optimized assets are synced into build/assets after build
-- [ ] Core menu art and selected gameplay art load successfully in PPSSPP
-- [ ] Texture memory behavior is acceptable for PSP constraints
-- [ ] Checklist marked complete for all milestones
+- [x] All targeted optimized folders exist under assets/
+- [x] Optimized assets are synced into build/assets after build
+- [x] Core menu art and selected gameplay art load successfully in PPSSPP
+- [x] Texture memory behavior is acceptable for PSP constraints
+- [x] Checklist marked complete for all milestones
 
 ---
 
@@ -375,6 +383,6 @@ Makefile `sync_build_artifacts` will copy `*-optimized/` folders to `build/asset
 
 - [x] Milestone 1 complete
 - [x] Milestone 2 complete
-- [ ] Milestone 3 complete
-- [ ] Milestone 4 complete
+- [x] Milestone 3 complete
+- [x] Milestone 4 complete
 

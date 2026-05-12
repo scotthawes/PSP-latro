@@ -1,0 +1,22 @@
+# Milestone 3 effects metadata
+
+# Source assets
+assets/balatro-textures/1x/Enhancers.png   (497x475)
+assets/balatro-textures/1x/boosters.png    (284x855)
+assets/balatro-textures/1x/BlindChips.png  (714x1054)
+
+# PSP outputs
+assets/balatro-effects-optimized/enhancers_psp.png   124x119
+assets/balatro-effects-optimized/boosters_psp.png     71x214
+assets/balatro-effects-optimized/blindchips_psp.png   179x264
+
+# Default profile decision
+Profile: 25% scale + reduced depth workflow
+Reason:
+- Keeps all three sheets within safe PSP texture dimensions
+- Smaller memory footprint than 50% downscale for tall sheets
+- Good enough for menu preview and future extraction reference
+
+# Render verification target
+- At least one of these sheets must load and render in PPSSPP.
+- Prefer Enhancers preview for initial visual check because it is the cleanest and smallest sheet.

@@ -25,6 +25,8 @@ static bool s_title_logo_draw_logged = false;
 static int s_jokers_preview_texture = -1;
 static int s_tarots_preview_texture = -1;
 static bool s_cards_preview_draw_logged = false;
+static int s_effect_preview_texture = -1;
+static bool s_effect_preview_draw_logged = false;
 
 #define MENU_WALLPAPER_VARIANT_COUNT 2
 static int s_title_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
@@ -218,6 +220,15 @@ static void menu_init_wallpapers()
         s_tarots_preview_texture = menu_load_texture_from_candidates(tarots_candidates, 1);
     }
 
+    if (s_effect_preview_texture < 0)
+    {
+        DEBUG_PRINTF("[ASSET_VERIFY] loading effect preview texture\n");
+        const char *effect_candidates[] = {
+            "balatro-effects-optimized/enhancers_psp.png"
+        };
+        s_effect_preview_texture = menu_load_texture_from_candidates(effect_candidates, 1);
+    }
+
     s_wallpapers_initialized = true;
 }
 
@@ -343,11 +354,35 @@ static void menu_draw_title()
         }
     }
 
+    if (s_effect_preview_texture >= 0)
+    {
+        int effect_w = 0;
+        int effect_h = 0;
+        if (graphics_get_texture_content_size(s_effect_preview_texture, &effect_w, &effect_h))
+        {
+            float preview_w = 94.0f;
+            float preview_h = 90.0f;
+            float preview_x = 18.0f;
+            float preview_y = 150.0f;
+
+            graphics_set_texture(s_effect_preview_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+            graphics_draw_quad(preview_x, preview_y, preview_w, preview_h, 0, 0, effect_w, effect_h, 0xFFFFFFFF);
+            menu_draw_rect_border(preview_x, preview_y, preview_w, preview_h, 0xFF006D96, 1);
+        }
+    }
+
     if (!s_cards_preview_draw_logged && s_jokers_preview_texture >= 0 && s_tarots_preview_texture >= 0)
     {
         DEBUG_PRINTF("[ASSET_VERIFY] drawing card previews in title scene jokers_tex=%d tarots_tex=%d\n",
                      s_jokers_preview_texture, s_tarots_preview_texture);
         s_cards_preview_draw_logged = true;
+    }
+
+    if (!s_effect_preview_draw_logged && s_effect_preview_texture >= 0)
+    {
+        DEBUG_PRINTF("[ASSET_VERIFY] drawing effect preview in title scene effect_tex=%d\n",
+                     s_effect_preview_texture);
+        s_effect_preview_draw_logged = true;
     }
 
     // Blinking "Press X to Start" with pulsing effect
