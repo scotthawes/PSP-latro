@@ -1472,12 +1472,78 @@ void game_init_full_deck()
 
 void game_start_shop(bool init);
 
+static char g_settings_file_path[256] = "settings.ini";
+
+static bool game_resolve_settings_path_for_read(char *out_path, size_t out_path_size)
+{
+    const char *candidates[] = {
+        "ms0:/PSP/GAME/PSPALATRO/settings.ini",
+        "ms0:/PSP/GAME/PSPALATRO/./settings.ini",
+        "/PSP/GAME/PSPALATRO/settings.ini",
+        "settings.ini",
+        "./settings.ini",
+        "../settings.ini",
+        "assets/settings.ini"
+    };
+
+    for (int i = 0; i < (int)(sizeof(candidates) / sizeof(candidates[0])); i++)
+    {
+        FILE *f = fopen(candidates[i], "r");
+        if (f)
+        {
+            fclose(f);
+            snprintf(out_path, out_path_size, "%s", candidates[i]);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool game_resolve_settings_path_for_write(char *out_path, size_t out_path_size)
+{
+    const char *candidates[] = {
+        g_settings_file_path,
+        "ms0:/PSP/GAME/PSPALATRO/settings.ini",
+        "ms0:/PSP/GAME/PSPALATRO/./settings.ini",
+        "/PSP/GAME/PSPALATRO/settings.ini",
+        "settings.ini",
+        "./settings.ini",
+        "assets/settings.ini"
+    };
+
+    for (int i = 0; i < (int)(sizeof(candidates) / sizeof(candidates[0])); i++)
+    {
+        if (candidates[i] == NULL || candidates[i][0] == '\0')
+        {
+            continue;
+        }
+
+        FILE *f = fopen(candidates[i], "a");
+        if (f)
+        {
+            fclose(f);
+            snprintf(out_path, out_path_size, "%s", candidates[i]);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool game_init_load_file_values()
 {
     char buffer[128];
+    char settings_path[256];
 
     game_draw_loading_text("Loading \"settings.ini\"", COLOR_WHITE, COLOR_BLACK);
-    if (!ini_open("settings.ini"))
+    if (!game_resolve_settings_path_for_read(settings_path, sizeof(settings_path)))
+    {
+        game_draw_loading_text("Could not open \"settings.ini\"", COLOR_TEXT_YELLOW, COLOR_BLACK);
+        return true;
+    }
+
+    if (!ini_open(settings_path))
     {
         game_draw_loading_text("Could not open \"settings.ini\"", COLOR_TEXT_YELLOW, COLOR_BLACK);
         return true;
@@ -1600,13 +1666,20 @@ bool game_init_load_file_values()
     } while (token_type != INI_TOKEN_EOF);
 
     ini_close();
+    snprintf(g_settings_file_path, sizeof(g_settings_file_path), "%s", settings_path);
 
     return true;
 }
 
 bool game_save_file_values()
 {
-    FILE *f = fopen("settings.ini", "w");
+    char settings_path[256];
+    if (!game_resolve_settings_path_for_write(settings_path, sizeof(settings_path)))
+    {
+        return false;
+    }
+
+    FILE *f = fopen(settings_path, "w");
     if (f == NULL)
     {
         return false;
@@ -1629,6 +1702,7 @@ bool game_save_file_values()
     fprintf(f, "wallpaper_variant = %d\n", g_settings.wallpaper_variant);
 
     fclose(f);
+    snprintf(g_settings_file_path, sizeof(g_settings_file_path), "%s", settings_path);
     return true;
 }
 

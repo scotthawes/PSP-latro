@@ -449,12 +449,26 @@ int get_closest_power_of_2(int x)
 
 struct Image graphics_load_image_from_archive(const char *filename)
 {
-    struct Image image;
+    /* Allow local overrides first so custom art can be tested without repacking game.love. */
+    struct Image image = graphics_load_image(filename);
+    if (image.data != NULL)
+    {
+        char str[64];
+        snprintf(str, sizeof(str), "Override: \"%s\"", filename);
+        DEBUG_PRINTF("[TEX] Loaded from local override: %s\n", filename);
+        game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
+        return image;
+    }
+
     image.data = NULL;
+    image.w = 0;
+    image.h = 0;
+    image.channels = 0;
 
     size_t file_size;
     char str[64];
-    sprintf(str, "Loading \"%s\" from archive", filename);
+    snprintf(str, sizeof(str), "Archive: \"%s\"", filename);
+    DEBUG_PRINTF("[TEX] Loading from archive: %s\n", filename);
     game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
     uint8_t *buffer = archive_load_file_entry(filename, &file_size);
     if (buffer == NULL)
@@ -483,20 +497,34 @@ struct Image graphics_load_image(const char *filename)
     image.h = 0;
     image.channels = 0;
 
-    // Try multiple path formats to handle both dev and PSP environments
-    char attempts[7][256] = {{0}};
+    // Try multiple path formats to handle both dev and PSP environments.
+    // Keep local override folders early so user-provided assets win over archive content.
+    char attempts[18][256] = {{0}};
     int attempt_count = 0;
 
-    // Direct path
+    // Direct and relative paths
     snprintf(attempts[attempt_count++], 256, "%s", filename);
-    // Relative paths
     snprintf(attempts[attempt_count++], 256, "./%s", filename);
     snprintf(attempts[attempt_count++], 256, "../%s", filename);
     snprintf(attempts[attempt_count++], 256, "../../%s", filename);
+
+    // Local asset override folders in repo/deploy layout
+    snprintf(attempts[attempt_count++], 256, "assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "assets/out/assets/%s", filename);
+
     // PSP filesystem paths
     snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/%s", filename);
     snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/./%s", filename);
     snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/%s", filename);
+
+    // PSP-local override folders
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "ms0:/PSP/GAME/PSPALATRO/assets/out/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/assets/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/assets/out/%s", filename);
+    snprintf(attempts[attempt_count++], 256, "/PSP/GAME/PSPALATRO/assets/out/assets/%s", filename);
 
     for (int i = 0; i < attempt_count; i++)
     {
@@ -504,13 +532,12 @@ struct Image graphics_load_image(const char *filename)
         if (image.data != NULL)
         {
             g_allocated_graphic_bytes += image.w * image.h * image.channels;
-            DEBUG_PRINTF("Loaded image %s with size %dx%d\n", attempts[i], image.w, image.h);
-            DEBUG_PRINTF("Allocated graphics: %d\n", g_allocated_graphic_bytes);
+            DEBUG_PRINTF("[TEX] Loaded %s from path[%d]: %s (%dx%d)\n", filename, i, attempts[i], image.w, image.h);
             return image;
         }
     }
 
-    DEBUG_PRINTF("Failed to load image %s from all paths\n", filename);
+    DEBUG_PRINTF("[TEX] FAILED to load %s from all %d paths\n", filename, attempt_count);
     return image;
 }
 
