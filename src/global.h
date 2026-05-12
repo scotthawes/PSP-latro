@@ -1095,6 +1095,7 @@ int graphics_load_texture_from_archive_16bit(const char *filename, int start_x, 
 int graphics_load_texture(const char *filename, int start_x, int start_y);
 int graphics_load_texture_16bit(const char *filename, int start_x, int start_y);
 int graphics_load_wallpaper(const char *filename);
+bool graphics_get_texture_content_size(int texture, int *out_width, int *out_height);
 void graphics_destroy_texture(int texture);
 int graphics_load_font(const char *filename, int width, int height, int length_x, int length_y);
 void graphics_destroy_font(int font);

@@ -21,6 +21,9 @@ struct DebugInfo g_debug_info;
 
 int ogg_id = -1;
 bool g_init_resources_ok = false;
+static bool g_audio_start_pending = false;
+static bool g_archive_kept_open_for_audio = false;
+static int g_audio_deferred_frame_count = 0;
 
 #define FORCE_PRESENTATION_TEST 0
 
@@ -124,23 +127,12 @@ bool init_more_stuff()
     {
         audio_start_thread();
         boot_log("init_more_stuff: audio thread started");
-
-        game_draw_loading_text("Loading audio file", COLOR_WHITE, COLOR_BLACK);
-        ogg_id = audio_load_ogg_from_archive("resources/sounds/music1.ogg");
-        if (ogg_id < 0)
-        {
-            boot_log("init_more_stuff: audio load failed");
-            g_settings.audio = false;
-        }
-
-        if (g_settings.audio)
-        {
-            audio_play_ogg(ogg_id, 0.8f);
-            boot_log("init_more_stuff: audio playback started");
-        }
+        g_audio_start_pending = true;
+        g_archive_kept_open_for_audio = archive_opened;
+        boot_log("init_more_stuff: audio deferred until gameplay loop");
     }
 
-    if (archive_opened)
+    if (archive_opened && !g_archive_kept_open_for_audio)
     {
         archive_close();
     }
@@ -149,6 +141,60 @@ bool init_more_stuff()
     boot_log("init_more_stuff: event_init done");
 
     return true;
+}
+
+static void game_try_start_audio_once()
+{
+    if (!g_audio_start_pending || !g_settings.audio)
+    {
+        return;
+    }
+
+    g_audio_start_pending = false;
+    boot_log("audio_deferred: begin");
+
+    bool archive_opened = g_archive_kept_open_for_audio;
+    if (!archive_opened)
+    {
+        const char *fallback_archives[] = {
+            "game.love",
+            "build/Balatro V0.11.vpk",
+            "third_party/balatro-v011-reference/game.love",
+            "Balatro V0.11.vpk",
+            "Balatro.exe"
+        };
+
+        for (int i = 0; i < (int)(sizeof(fallback_archives) / sizeof(fallback_archives[0])); i++)
+        {
+            if (archive_open(fallback_archives[i]))
+            {
+                archive_opened = true;
+                break;
+            }
+        }
+    }
+
+    if (!archive_opened)
+    {
+        boot_log("audio_deferred: archive open failed");
+        g_settings.audio = false;
+        g_archive_kept_open_for_audio = false;
+        return;
+    }
+
+    ogg_id = audio_load_ogg_from_archive("resources/sounds/music1.ogg");
+    archive_close();
+    g_archive_kept_open_for_audio = false;
+
+    if (ogg_id < 0)
+    {
+        boot_log("audio_deferred: load failed");
+        g_settings.audio = false;
+        return;
+    }
+
+    audio_play_ogg(ogg_id, 0.8f);
+    boot_log("audio_deferred: playback started");
 }
 
 int main(int argc, char **argv)
@@ -220,11 +266,61 @@ int main(int argc, char **argv)
     if (init_more_stuff())
     {
         boot_log("main: entering gameplay loop");
+
+        /* Ensure loading text frame is replaced before any deferred work can stall. */
+        boot_log("main: pre-initial-frame-clear");
+        graphics_begin_draw();
+        graphics_clear(COLOR_BACKGROUND_2);
+        graphics_end_draw();
+        boot_log("main: post-initial-frame-clear");
+
+        uint32_t loop_heartbeat = 0;
+        bool first_loop_logged = false;
         while(running())
         {
+            if (!first_loop_logged)
+            {
+                boot_log("main: first gameplay loop iteration");
+                first_loop_logged = true;
+            }
+
+            if (loop_heartbeat < 5)
+            {
+                boot_log("loop: before input_update");
+            }
             input_update();
+
+            if (loop_heartbeat < 5)
+            {
+                boot_log("loop: before game_update");
+            }
             game_update();
+
+            if (loop_heartbeat < 5)
+            {
+                boot_log("loop: before game_draw");
+            }
             game_draw();
+
+            if (loop_heartbeat < 5)
+            {
+                boot_log("loop: after game_draw");
+            }
+
+            loop_heartbeat++;
+            if ((loop_heartbeat % 300) == 0)
+            {
+                boot_log("main: gameplay loop heartbeat");
+            }
+
+            if (g_audio_start_pending)
+            {
+                g_audio_deferred_frame_count++;
+                if (g_audio_deferred_frame_count >= 30)
+                {
+                    game_try_start_audio_once();
+                }
+            }
         }
     }
     else
@@ -249,7 +345,16 @@ int main(int argc, char **argv)
     if (g_settings.audio)
     {
         audio_stop();
-        audio_destroy_ogg(ogg_id);
+        if (ogg_id >= 0)
+        {
+            audio_destroy_ogg(ogg_id);
+        }
+    }
+
+    if (g_archive_kept_open_for_audio)
+    {
+        archive_close();
+        g_archive_kept_open_for_audio = false;
     }
 
     audio_end();    

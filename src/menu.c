@@ -35,14 +35,55 @@ static int menu_load_wallpaper_from_candidates(const char *candidates[], int can
 {
     for (int i = 0; i < candidate_count; i++)
     {
+        DEBUG_PRINTF("[WALLPAPER] trying: %s\n", candidates[i]);
         int texture = graphics_load_wallpaper(candidates[i]);
         if (texture >= 0)
         {
+            DEBUG_PRINTF("[WALLPAPER] loaded: %s (texture=%d)\n", candidates[i], texture);
             return texture;
         }
+        DEBUG_PRINTF("[WALLPAPER] failed: %s\n", candidates[i]);
     }
 
     return -1;
+}
+
+static void menu_load_wallpaper_variant(int variant)
+{
+    if (variant < 0 || variant >= MENU_WALLPAPER_VARIANT_COUNT)
+    {
+        return;
+    }
+
+    if (s_title_wallpaper_textures[variant] >= 0 && s_main_wallpaper_textures[variant] >= 0)
+    {
+        return;
+    }
+
+    if (variant == 0)
+    {
+        const char *title_candidates[] = {
+            "wallpapers/title_wallpaper.png"
+        };
+        const char *main_candidates[] = {
+            "wallpapers/main_menu_wallpaper.png"
+        };
+
+        s_title_wallpaper_textures[0] = menu_load_wallpaper_from_candidates(title_candidates, 1);
+        s_main_wallpaper_textures[0] = menu_load_wallpaper_from_candidates(main_candidates, 1);
+    }
+    else
+    {
+        const char *title_candidates[] = {
+            "wallpapers/title_wallpaper_b.png"
+        };
+        const char *main_candidates[] = {
+            "wallpapers/main_menu_wallpaper_b.png"
+        };
+
+        s_title_wallpaper_textures[1] = menu_load_wallpaper_from_candidates(title_candidates, 1);
+        s_main_wallpaper_textures[1] = menu_load_wallpaper_from_candidates(main_candidates, 1);
+    }
 }
 
 // ----------------------------------------------------------------
@@ -99,40 +140,30 @@ static void menu_init_wallpapers()
         return;
     }
 
-    // Variant A candidates
-    const char *title_candidates_a[] = {
-        "assets/wallpapers/title_wallpaper.png",
-        "media/balatro-joker-cards-hm1csfqn1sahsgcz.png",
-        "media/image-1.png"
-    };
-    const char *main_candidates_a[] = {
-        "assets/wallpapers/main_menu_wallpaper.png",
-        "media/balatro-symbolism-and-meaning-1c57ukldt9ozwcrs.png",
-        "media/image-1.png"
-    };
-
-    // Variant B candidates
-    const char *title_candidates_b[] = {
-        "assets/wallpapers/title_wallpaper_b.png",
-        "media/balatro-jesters-artwork-4go7w3oia39s3ckt.png",
-        "media/image-1.png"
-    };
-    const char *main_candidates_b[] = {
-        "assets/wallpapers/main_menu_wallpaper_b.png",
-        "media/balatro-joker-cards-47ghpu2a61spz52l.png",
-        "media/image-1.png"
-    };
-
-    s_title_wallpaper_textures[0] = menu_load_wallpaper_from_candidates(title_candidates_a, 3);
-    s_main_wallpaper_textures[0] = menu_load_wallpaper_from_candidates(main_candidates_a, 3);
-    s_title_wallpaper_textures[1] = menu_load_wallpaper_from_candidates(title_candidates_b, 3);
-    s_main_wallpaper_textures[1] = menu_load_wallpaper_from_candidates(main_candidates_b, 3);
-
-    // Ensure both variants always have something usable.
-    if (s_title_wallpaper_textures[1] < 0) s_title_wallpaper_textures[1] = s_title_wallpaper_textures[0];
-    if (s_main_wallpaper_textures[1] < 0) s_main_wallpaper_textures[1] = s_main_wallpaper_textures[0];
+    for (int i = 0; i < MENU_WALLPAPER_VARIANT_COUNT; i++)
+    {
+        s_title_wallpaper_textures[i] = -1;
+        s_main_wallpaper_textures[i] = -1;
+    }
 
     s_wallpaper_variant = CLAMP(g_settings.wallpaper_variant, 0, MENU_WALLPAPER_VARIANT_COUNT - 1);
+
+    // Load only the currently selected variant during startup to reduce first-frame load cost.
+    menu_load_wallpaper_variant(s_wallpaper_variant);
+    if (s_title_wallpaper_textures[s_wallpaper_variant] < 0 || s_main_wallpaper_textures[s_wallpaper_variant] < 0)
+    {
+        menu_load_wallpaper_variant(0);
+    }
+
+    if (s_title_wallpaper_textures[s_wallpaper_variant] < 0)
+    {
+        s_title_wallpaper_textures[s_wallpaper_variant] = s_title_wallpaper_textures[0];
+    }
+    if (s_main_wallpaper_textures[s_wallpaper_variant] < 0)
+    {
+        s_main_wallpaper_textures[s_wallpaper_variant] = s_main_wallpaper_textures[0];
+    }
+
     s_title_wallpaper_texture = s_title_wallpaper_textures[s_wallpaper_variant];
     s_main_wallpaper_texture = s_main_wallpaper_textures[s_wallpaper_variant];
 
@@ -146,8 +177,17 @@ void menu_draw_wallpaper(int texture_id) {
         return;
     }
 
+    int content_w = SCREEN_WIDTH;
+    int content_h = SCREEN_HEIGHT;
+    if (!graphics_get_texture_content_size(texture_id, &content_w, &content_h))
+    {
+        content_w = SCREEN_WIDTH;
+        content_h = SCREEN_HEIGHT;
+        DEBUG_PRINTF("[WALLPAPER] texture %d missing size metadata, using screen size UV\n", texture_id);
+    }
+
     graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_LINEAR);
-    graphics_draw_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFFFFFFFF);
+    graphics_draw_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, content_w, content_h, 0xFFFFFFFF);
 }
 
 // ----------------------------------------------------------------
@@ -481,6 +521,18 @@ void menu_input_options(bool no_input)
                 break;
             case MENU_OPTIONS_ITEM_WALLPAPER:
                 s_wallpaper_variant = (s_wallpaper_variant + 1) % MENU_WALLPAPER_VARIANT_COUNT;
+
+                // Load selected variant on demand instead of decoding all variants at boot.
+                menu_load_wallpaper_variant(s_wallpaper_variant);
+                if (s_title_wallpaper_textures[s_wallpaper_variant] < 0)
+                {
+                    s_title_wallpaper_textures[s_wallpaper_variant] = s_title_wallpaper_textures[0];
+                }
+                if (s_main_wallpaper_textures[s_wallpaper_variant] < 0)
+                {
+                    s_main_wallpaper_textures[s_wallpaper_variant] = s_main_wallpaper_textures[0];
+                }
+
                 s_title_wallpaper_texture = s_title_wallpaper_textures[s_wallpaper_variant];
                 s_main_wallpaper_texture = s_main_wallpaper_textures[s_wallpaper_variant];
                 g_settings.wallpaper_variant = s_wallpaper_variant;
