@@ -42,6 +42,17 @@ Goal: bring the PSP title/menu UI closer to the reference Balatro title screen w
 
 ## Progress Tracking
 
-- Status: Completed (visual comparison closed)
-- Current focus: Parity pass complete; maintain stability while iterating minor polish only.
-- Next: Optional collection-screen implementation and non-regression visual QA on hardware/emulator.
+- Status: In progress (new side-by-side gap pass opened)
+- Current focus: Fix hard parity gaps from latest PSP capture vs reference.
+- Next: Complete required changes below, then rerun screenshot-by-screenshot parity check.
+
+## Required Changes From Latest Side-By-Side
+
+- [x] 1. Ensure title logo never falls back to placeholder text when mapped logo assets exist.
+- [ ] 2. Fine-tune logo scale/position to match reference vertical balance.
+- [ ] 3. Tighten bottom action bar thickness/spacing to reference compactness.
+- [ ] 4. Reduce button border heaviness and texture noise for cleaner blocks.
+- [ ] 5. Align profile, social, and language chips to the tighter right-lower cluster pattern.
+- [ ] 6. Confirm version text size/offset matches reference subtle top-right placement.
+- [ ] 7. Capture new PPSSPP screenshot and perform another side-by-side diff pass.
+- [ ] 8. Verify emulator debug overlays are disabled for comparison captures (PPSSPP setting, not game UI).

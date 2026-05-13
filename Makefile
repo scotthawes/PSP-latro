@@ -23,6 +23,10 @@ PSP_EBOOT_TITLE = PSPalatro
 PSP_EBOOT_ICON = media/pspalatro_icon.png
 PSP_EBOOT_PIC1 = media/pspalatro_pic.png
 
+# Unity-build dependency: main.c includes many src/*.c and src/*.h files.
+# Rebuild main.o when any included source/header changes.
+src/main.o: $(wildcard src/*.c src/*.h)
+
 include $(PSPSDK)/lib/build.mak
 
 # Keep build/ launch artifacts in sync with the freshly built EBOOT.
@@ -32,9 +36,16 @@ sync_build_artifacts: EBOOT.PBP
 	@mkdir -p build
 	@mkdir -p build/assets
 	@cp EBOOT.PBP build/EBOOT.PBP
+	@rm -rf build/assets
+	@cp -r assets build/assets
 	@cp assets/out/assets/editions.png build/ 2>/dev/null || true
+	@mkdir -p $(HOME)/.config/ppsspp/PSP/GAME/PSPALATRO
+	@cp EBOOT.PBP $(HOME)/.config/ppsspp/PSP/GAME/PSPALATRO/EBOOT.PBP 2>/dev/null || true
+	@rm -rf $(HOME)/.config/ppsspp/PSP/GAME/PSPALATRO/assets 2>/dev/null || true
+	@cp -r assets $(HOME)/.config/ppsspp/PSP/GAME/PSPALATRO/assets 2>/dev/null || true
+	@cp settings.ini $(HOME)/.config/ppsspp/PSP/GAME/PSPALATRO/settings.ini 2>/dev/null || true
 
-	@echo "Synced build/EBOOT.PBP and local runtime assets."
+	@echo "Synced build and PPSSPP runtime artifacts."
 
 # Deploy assets to build directory for PSP runtime
 install: EBOOT.PBP
