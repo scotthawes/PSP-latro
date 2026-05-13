@@ -26,6 +26,9 @@ static void fmt_num(char *buf, double n)
 #define TEXTURE_CARD_WIDTH  69
 #define TEXTURE_CARD_HEIGHT 93
 
+#define PSP_TEX_CARD_WIDTH   17
+#define PSP_TEX_CARD_HEIGHT  23
+
 int tex_enhancers, tex_deck, tex_deck2, tex_gamepad_ui, tex_editions, tex_shop, tex_ui_assets;
 int tex_jokers[2][4];
 int tex_tarots[2][2];
@@ -129,7 +132,7 @@ bool game_init_draw()
     tex_deck2 = graphics_load_texture_from_image_16bit(&deck_image, 71*7, 0);
     graphics_destroy_image(&deck_image);
 
-    struct Image joker_image = graphics_load_image_from_archive("resources/textures/1x/Jokers.png");
+    struct Image joker_image = graphics_load_image_from_archive("balatro-cards-optimized/jokers/jokers_psp.png");
     if (joker_image.data == NULL) return false;
     for(int i = 0; i < 2; i++)
     {
@@ -138,7 +141,7 @@ bool game_init_draw()
             DEBUG_PRINTF("Loading Jokers (%d; %d)\n", i, j);
             sprintf(str, "Creating joker texture %d", i*4+j);
             game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
-            tex_jokers[i][j] = graphics_load_texture_from_image_16bit(&joker_image, i * (TEXTURE_CARD_WIDTH + 2) * 7, j * (TEXTURE_CARD_HEIGHT + 2) * 5);
+            tex_jokers[i][j] = graphics_load_texture_from_image_16bit(&joker_image, i * (PSP_TEX_CARD_WIDTH + 2) * 7, j * (PSP_TEX_CARD_HEIGHT + 2) * 5);
         }
     }
     graphics_destroy_image(&joker_image);
@@ -147,7 +150,7 @@ bool game_init_draw()
     if (tex_gamepad_ui < 0) return false;
 
     game_draw_loading_text("Loading Tarots.png", COLOR_WHITE, COLOR_BLACK);
-    struct Image tarots_image = graphics_load_image_from_archive("resources/textures/1x/Tarots.png");
+    struct Image tarots_image = graphics_load_image_from_archive("balatro-cards-optimized/tarots/tarots_psp.png");
     if (tarots_image.data == NULL) return false;
     for(int i = 0; i < 2; i++)
     {
@@ -156,7 +159,7 @@ bool game_init_draw()
             DEBUG_PRINTF("Loading Tarots (%d; %d)\n", i, j);
             sprintf(str, "Creating tarots texture %d", i*2+j);
             game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
-            tex_tarots[i][j] = graphics_load_texture_from_image_16bit(&tarots_image, i * (TEXTURE_CARD_WIDTH + 2) * 7, j * (TEXTURE_CARD_HEIGHT + 2) * 5);
+            tex_tarots[i][j] = graphics_load_texture_from_image_16bit(&tarots_image, i * (PSP_TEX_CARD_WIDTH + 2) * 7, j * (PSP_TEX_CARD_HEIGHT + 2) * 5);
         }
     }
     graphics_destroy_image(&tarots_image);
@@ -164,14 +167,14 @@ bool game_init_draw()
     tex_editions = graphics_load_texture_16bit("editions.png", 0, 0);
     if (tex_editions < 0) return false;
 
-    struct Image boosters_image = graphics_load_image_from_archive("resources/textures/1x/boosters.png");
+    struct Image boosters_image = graphics_load_image_from_archive("balatro-effects-optimized/boosters_psp.png");
     if (boosters_image.data == NULL) return false;
     for(int j = 0; j < 2; j++)
     {
         DEBUG_PRINTF("Loading boosters (%d)\n", j);
         sprintf(str, "Creating boosters texture %d", j);
         game_draw_loading_text(str, COLOR_WHITE, COLOR_BLACK);
-        tex_boosters[j] = graphics_load_texture_from_image_16bit(&boosters_image, 0, j * (TEXTURE_CARD_HEIGHT + 2) * 5);
+        tex_boosters[j] = graphics_load_texture_from_image_16bit(&boosters_image, 0, j * (PSP_TEX_CARD_HEIGHT + 2) * 5);
     }
     graphics_destroy_image(&boosters_image);
 
@@ -598,9 +601,9 @@ void game_draw_joker(struct Joker *joker)
     graphics_set_texture(tex_jokers[tex_joker_x][tex_joker_y], GRAPHICS_TEXTURE_FILTER_LINEAR);
     graphics_draw_rotated_quad(
         x, y, w, h,
-        1 + (joker_type->u - tex_joker_x * 7) * (TEXTURE_CARD_WIDTH + 2),
-        1 + (joker_type->v - tex_joker_y * 5) * (TEXTURE_CARD_HEIGHT + 2),
-        TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, 0xFFFFFFFF, joker->draw.angle);
+        1 + (joker_type->u - tex_joker_x * 7) * (PSP_TEX_CARD_WIDTH + 2),
+        1 + (joker_type->v - tex_joker_y * 5) * (PSP_TEX_CARD_HEIGHT + 2),
+        PSP_TEX_CARD_WIDTH, PSP_TEX_CARD_HEIGHT, 0xFFFFFFFF, joker->draw.angle);
 
     if (joker->type == JOKER_TYPE_HOLOGRAM)
     {
@@ -609,9 +612,9 @@ void game_draw_joker(struct Joker *joker)
         graphics_set_texture(tex_jokers[tex_joker_x][tex_joker_y], GRAPHICS_TEXTURE_FILTER_LINEAR);
         graphics_draw_rotated_quad(
             x, y, w, h,
-            1 + (2 - tex_joker_x * 7) * (TEXTURE_CARD_WIDTH + 2),
-            1 + (9 - tex_joker_y * 5) * (TEXTURE_CARD_HEIGHT + 2),
-            TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, 0xFFFFFFFF, joker->draw.angle);
+            1 + (2 - tex_joker_x * 7) * (PSP_TEX_CARD_WIDTH + 2),
+            1 + (9 - tex_joker_y * 5) * (PSP_TEX_CARD_HEIGHT + 2),
+            PSP_TEX_CARD_WIDTH, PSP_TEX_CARD_HEIGHT, 0xFFFFFFFF, joker->draw.angle);
     }
 
     if (joker->edition == CARD_EDITION_NEGATIVE)
@@ -687,9 +690,9 @@ void game_draw_tarot(struct Tarot *tarot)
     graphics_set_texture(tex_tarots[tex_tarot_x][tex_tarot_y], GRAPHICS_TEXTURE_FILTER_LINEAR);
     graphics_draw_rotated_quad(
         x, y, CARD_WIDTH, CARD_HEIGHT,
-        1 + (tarot_type->u - tex_tarot_x * 7) * (TEXTURE_CARD_WIDTH + 2),
-        1 + (tarot_type->v - tex_tarot_y * 5) * (TEXTURE_CARD_HEIGHT + 2),
-        TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, COLOR_WHITE, tarot->draw.angle);
+        1 + (tarot_type->u - tex_tarot_x * 7) * (PSP_TEX_CARD_WIDTH + 2),
+        1 + (tarot_type->v - tex_tarot_y * 5) * (PSP_TEX_CARD_HEIGHT + 2),
+        PSP_TEX_CARD_WIDTH, PSP_TEX_CARD_HEIGHT, COLOR_WHITE, tarot->draw.angle);
     
     if (tarot->draw.white_factor > 0.0f)
     {
@@ -712,9 +715,9 @@ void game_draw_planet(struct Planet *planet)
     graphics_set_texture(tex_tarots[tex_planet_x][tex_planet_y], GRAPHICS_TEXTURE_FILTER_LINEAR);
     graphics_draw_rotated_quad(
         x, y, CARD_WIDTH, CARD_HEIGHT,
-        1 + (planet_type->u - tex_planet_x * 7) * (TEXTURE_CARD_WIDTH + 2),
-        1 + (planet_type->v - tex_planet_y * 5) * (TEXTURE_CARD_HEIGHT + 2),
-        TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, COLOR_WHITE, planet->draw.angle);
+        1 + (planet_type->u - tex_planet_x * 7) * (PSP_TEX_CARD_WIDTH + 2),
+        1 + (planet_type->v - tex_planet_y * 5) * (PSP_TEX_CARD_HEIGHT + 2),
+        PSP_TEX_CARD_WIDTH, PSP_TEX_CARD_HEIGHT, COLOR_WHITE, planet->draw.angle);
     
     if (planet->draw.white_factor > 0.0f)
     {
@@ -736,9 +739,9 @@ void game_draw_booster(struct BoosterPack *booster)
     graphics_set_texture(tex_boosters[text_booster_y], GRAPHICS_TEXTURE_FILTER_LINEAR);
     graphics_draw_rotated_quad(
         x, y, BOOSTER_WIDTH, BOOSTER_HEIGHT,
-        1 + (booster_type->u) * (TEXTURE_CARD_WIDTH + 2),
-        1 + (booster_type->v - text_booster_y * 5) * (TEXTURE_CARD_HEIGHT + 2),
-        TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, COLOR_WHITE, booster->draw.angle);
+        1 + (booster_type->u) * (PSP_TEX_CARD_WIDTH + 2),
+        1 + (booster_type->v - text_booster_y * 5) * (PSP_TEX_CARD_HEIGHT + 2),
+        PSP_TEX_CARD_WIDTH, PSP_TEX_CARD_HEIGHT, COLOR_WHITE, booster->draw.angle);
     game_draw_price_tag(&(booster->draw), game_util_get_booster_price(booster));
 }
 
@@ -1927,34 +1930,23 @@ void game_draw_debug_info()
 
 void game_draw()
 {
-    DEBUG_PRINTF("[DRAW] enter game_draw\n");
     graphics_begin_draw();
-    DEBUG_PRINTF("[DRAW] after graphics_begin_draw\n");
     graphics_clear(COLOR_BACKGROUND_2);
-    DEBUG_PRINTF("[DRAW] after graphics_clear\n");
 
     switch (g_game_state.stage)
     {
         case GAME_STAGE_MENU:
-            DEBUG_PRINTF("[DRAW] menu_draw start\n");
             menu_draw();
-            DEBUG_PRINTF("[DRAW] menu_draw end\n");
             break;
         case GAME_STAGE_BLINDS:
-            DEBUG_PRINTF("[DRAW] game_draw_blind_select start\n");
             game_draw_blind_select();            
-            DEBUG_PRINTF("[DRAW] game_draw_blind_select end\n");
             break;
         case GAME_STAGE_INGAME:
-            DEBUG_PRINTF("[DRAW] game_draw_ingame start\n");
             game_draw_ingame();
-            DEBUG_PRINTF("[DRAW] game_draw_ingame end\n");
             break;
         case GAME_STAGE_SHOP:
         {
-            DEBUG_PRINTF("[DRAW] game_draw_shop start\n");
             game_draw_shop();
-            DEBUG_PRINTF("[DRAW] game_draw_shop end\n");
             break;
         }
     }
@@ -1970,8 +1962,6 @@ void game_draw()
     }
 
     game_draw_debug_info();
-    DEBUG_PRINTF("[DRAW] before graphics_end_draw\n");
 
     graphics_end_draw();
-    DEBUG_PRINTF("[DRAW] after graphics_end_draw\n");
 }

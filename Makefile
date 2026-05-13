@@ -33,12 +33,7 @@ sync_build_artifacts: EBOOT.PBP
 	@mkdir -p build/assets
 	@cp EBOOT.PBP build/EBOOT.PBP
 	@cp assets/out/assets/editions.png build/ 2>/dev/null || true
-	@cp -r assets/wallpapers build/assets/ 2>/dev/null || true
-	@cp -r assets/backgrounds build/assets/ 2>/dev/null || true
-	@cp -r assets/balatro-ui-optimized build/assets/ 2>/dev/null || true
-	@cp -r assets/balatro-cards-optimized build/assets/ 2>/dev/null || true
-	@cp -r assets/balatro-effects-optimized build/assets/ 2>/dev/null || true
-	@cp settings.ini build/ 2>/dev/null || true
+
 	@echo "Synced build/EBOOT.PBP and local runtime assets."
 
 # Deploy assets to build directory for PSP runtime
