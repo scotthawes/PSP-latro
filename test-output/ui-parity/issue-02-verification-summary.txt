@@ -1,0 +1,20 @@
+Issue 2 verification summary
+Generated: Fri May 15 23:08:14 BST 2026
+
+Archive load successes:
+431215:55:05:345              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/Enhancers.png with size 497x475
+431877:55:05:891              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/8BitDeck.png with size 923x380
+433387:55:06:920              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/gamepad_ui.png with size 640x128
+434934:55:07:975              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/ShopSignAnimation.png with size 452x57
+435413:55:08:456              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/ui_assets.png with size 72x36
+736537:01:18:690              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/Enhancers.png with size 497x475
+737199:01:19:238              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/8BitDeck.png with size 923x380
+738709:01:20:266              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/gamepad_ui.png with size 640x128
+740257:01:21:322              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/ShopSignAnimation.png with size 452x57
+740736:01:21:802              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/ui_assets.png with size 72x36
+
+Archive load errors (expected none):
+
+Menu missing markers (historical only):
+22092:52:38:644              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][MISSING] scene=menu_init key=action_button_collection path=balatro-ui-optimized/buttons/button_r0_c3.png
+22099:52:38:645              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][MISSING] unresolved_ui_assets=1

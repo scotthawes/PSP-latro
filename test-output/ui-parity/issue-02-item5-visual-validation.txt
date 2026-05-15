@@ -1,0 +1,24 @@
+Item 5 visual validation
+Generated: Fri May 15 23:11:53 BST 2026
+
+Hard failure markers (expected none):
+
+Menu asset markers:
+11545:09:47:989              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=title_background path=backgrounds/balatro_bg_alt.png texture=23
+12914:09:48:116              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=title_logo_primary path=balatro-ui-optimized/logo_main_psp_ace.png texture=24
+14053:09:48:234              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=profile_icon path=balatro-ui-optimized/icons/icon_r0_c0.png texture=25
+15184:09:48:274              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=language_icon path=balatro-ui-optimized/icons/icon_r0_c1.png texture=26
+16321:09:48:359              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=social_discord_icon path=balatro-ui-optimized/icons/icon_r0_c2.png texture=27
+17475:09:48:462              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=social_x_icon path=balatro-ui-optimized/icons/icon_r0_c3.png texture=28
+18627:09:48:493              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=action_button_play path=balatro-ui-optimized/buttons/button_r0_c0.png texture=29
+19777:09:48:622              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=action_button_options path=balatro-ui-optimized/buttons/button_r0_c1.png texture=30
+20936:09:48:770              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET] key=action_button_quit path=balatro-ui-optimized/buttons/button_r0_c2.png texture=31
+22091:09:48:789              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET][SKIP] scene=menu_init key=action_button_collection path=balatro-ui-optimized/buttons/button_r0_c3.png reason=optional_or_budget
+22098:09:48:791              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: [MENU][ASSET][FALLBACK] key=action_button_collection reused_texture=31
+
+Gameplay archive load markers:
+2626:09:44:562              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/Enhancers.png with size 497x475
+3287:09:45:141              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/8BitDeck.png with size 923x380
+4797:09:46:137              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/gamepad_ui.png with size 640x128
+6345:09:47:192              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/ShopSignAnimation.png with size 452x57
+6824:09:47:671              I[PRINTF]: HLE/sceIo.cpp:1207 stdout: Loaded image resources/textures/1x/ui_assets.png with size 72x36

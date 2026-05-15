@@ -58,6 +58,59 @@ int g_font_count = 0;
 
 int g_allocated_graphic_bytes = 0;
 
+static inline unsigned char graphics_font_map_char(unsigned char c);
+
+#ifdef DEBUG
+static int g_font_debug_log_budget = 24;
+
+static void graphics_debug_log_text_bytes(const char *tag, const char *text)
+{
+    if (text == NULL || g_font_debug_log_budget <= 0)
+    {
+        return;
+    }
+
+    char raw_hex[32 * 3 + 1] = {0};
+    char mapped_hex[32 * 3 + 1] = {0};
+    int raw_pos = 0;
+    int mapped_pos = 0;
+    int count = 0;
+    while (text[count] != '\0' && count < 32)
+    {
+        unsigned char raw = (unsigned char)text[count];
+        unsigned char mapped = graphics_font_map_char(raw);
+        raw_pos += snprintf(&raw_hex[raw_pos], sizeof(raw_hex) - raw_pos, "%02X ", raw);
+        mapped_pos += snprintf(&mapped_hex[mapped_pos], sizeof(mapped_hex) - mapped_pos, "%02X ", mapped);
+        count++;
+    }
+
+    DEBUG_PRINTF("[FONT][%s] first_%d raw=%s mapped=%s\n", tag, count, raw_hex, mapped_hex);
+    g_font_debug_log_budget--;
+}
+
+static void graphics_debug_validate_font_ascii_coverage(int font_slot)
+{
+    int glyph_count = g_fonts[font_slot].length_x * g_fonts[font_slot].length_y;
+    int missing = 0;
+
+    for (int c = 32; c <= 126; c++)
+    {
+        unsigned char mapped = graphics_font_map_char((unsigned char)c);
+        if ((int)mapped >= glyph_count)
+        {
+            missing++;
+            DEBUG_PRINTF("[FONT][WARN] slot=%d ascii=0x%02X mapped=0x%02X outside atlas glyph_count=%d\n",
+                font_slot, c, mapped, glyph_count);
+        }
+    }
+
+    if (missing == 0)
+    {
+        DEBUG_PRINTF("[FONT] slot=%d ASCII coverage OK (0x20-0x7E), glyph_count=%d\n", font_slot, glyph_count);
+    }
+}
+#endif
+
 static bool graphics_try_load_image_from_path(const char *path, struct Image *image)
 {
     image->data = stbi_load(path, &image->w, &image->h, &image->channels, 4);
@@ -465,6 +518,10 @@ int graphics_load_font_from_1bit_buffer(const char *buffer, int width, int heigh
     g_fonts[font_slot].length_x = length_x;
     g_fonts[font_slot].length_y = length_y;
     sceKernelDcacheWritebackInvalidateAll();
+
+#ifdef DEBUG
+    graphics_debug_validate_font_ascii_coverage(font_slot);
+#endif
 
     return font_slot;
 }
@@ -897,6 +954,10 @@ int graphics_load_font(const char *filename, int width, int height, int length_x
     g_fonts[font_slot].length_y = length_y;
     sceKernelDcacheWritebackInvalidateAll();
 
+#ifdef DEBUG
+    graphics_debug_validate_font_ascii_coverage(font_slot);
+#endif
+
     return font_slot;
 }
 
@@ -1088,11 +1149,111 @@ void graphics_draw_solid_quad(float x, float y, float w, float h, uint32_t color
     graphics_draw_quad(x, y, w, h, 0, 0, 0, 0, color);
 }
 
+static inline unsigned char graphics_font_map_char(unsigned char c)
+{
+    // Built-in font atlas stores lowercase glyphs one slot earlier than ASCII.
+    if (c >= 'a' && c <= 'z') return (unsigned char)(c - 1);
+    return c;
+}
+
+static inline unsigned char graphics_font_map_codepoint(unsigned int cp)
+{
+    if (cp > 0xFF)
+    {
+        cp = (unsigned int)'?';
+    }
+    return graphics_font_map_char((unsigned char)cp);
+}
+
+static unsigned int graphics_decode_codepoint_compat(const char *text, int *index)
+{
+    unsigned char c0 = (unsigned char)text[*index];
+    if (c0 == 0)
+    {
+        return 0;
+    }
+
+    if (c0 < 0x80)
+    {
+        (*index)++;
+        return (unsigned int)c0;
+    }
+
+    if ((c0 & 0xE0) == 0xC0)
+    {
+        unsigned char c1 = (unsigned char)text[*index + 1];
+        if ((c1 & 0xC0) == 0x80)
+        {
+            unsigned int cp = ((unsigned int)(c0 & 0x1F) << 6) | (unsigned int)(c1 & 0x3F);
+            if (cp >= 0x80)
+            {
+                *index += 2;
+                return cp;
+            }
+        }
+    }
+    else if ((c0 & 0xF0) == 0xE0)
+    {
+        unsigned char c1 = (unsigned char)text[*index + 1];
+        unsigned char c2 = (unsigned char)text[*index + 2];
+        if (((c1 & 0xC0) == 0x80) && ((c2 & 0xC0) == 0x80))
+        {
+            unsigned int cp = ((unsigned int)(c0 & 0x0F) << 12)
+                | ((unsigned int)(c1 & 0x3F) << 6)
+                | (unsigned int)(c2 & 0x3F);
+            if (cp >= 0x800 && !(cp >= 0xD800 && cp <= 0xDFFF))
+            {
+                *index += 3;
+                return cp;
+            }
+        }
+    }
+    else if ((c0 & 0xF8) == 0xF0)
+    {
+        unsigned char c1 = (unsigned char)text[*index + 1];
+        unsigned char c2 = (unsigned char)text[*index + 2];
+        unsigned char c3 = (unsigned char)text[*index + 3];
+        if (((c1 & 0xC0) == 0x80) && ((c2 & 0xC0) == 0x80) && ((c3 & 0xC0) == 0x80))
+        {
+            unsigned int cp = ((unsigned int)(c0 & 0x07) << 18)
+                | ((unsigned int)(c1 & 0x3F) << 12)
+                | ((unsigned int)(c2 & 0x3F) << 6)
+                | (unsigned int)(c3 & 0x3F);
+            if (cp >= 0x10000 && cp <= 0x10FFFF)
+            {
+                *index += 4;
+                return cp;
+            }
+        }
+    }
+
+    // Preserve legacy single-byte behavior when bytes are not valid UTF-8.
+    (*index)++;
+    return (unsigned int)c0;
+}
+
+static int graphics_count_text_columns_compat(const char *text)
+{
+    if (text == NULL)
+    {
+        return 0;
+    }
+
+    int index = 0;
+    int length = 0;
+    while (text[index] != 0)
+    {
+        (void)graphics_decode_codepoint_compat(text, &index);
+        length++;
+    }
+    return length;
+}
+
 void graphics_draw_text_center(int font, const char *text, float x, float y, float size, uint32_t color)
 {
     if (font < 0 || font >= MAX_FONTS || !g_fonts[font].in_use) return;
 
-    int length = strlen(text);
+    int length = graphics_count_text_columns_compat(text);
     graphics_draw_text(font, text, x - ((float)length / 2.0f * g_fonts[font].width * size), y - (g_fonts[font].height * size / 2.0f), size, color);
 }
 
@@ -1100,17 +1261,23 @@ void graphics_draw_text(int font, const char *text, float x, float y, float size
 {
     if (font < 0 || font >= MAX_FONTS || !g_fonts[font].in_use) return;
 
+#ifdef DEBUG
+    graphics_debug_log_text_bytes("draw_text", text);
+#endif
+
     graphics_set_texture(g_fonts[font].texture, GRAPHICS_TEXTURE_FILTER_NEAREST);
 
     int count = 0;
-    unsigned char c = text[0];
-    while (c != 0)
+    int index = 0;
+    while (text[index] != 0)
     {
+        unsigned int cp = graphics_decode_codepoint_compat(text, &index);
+        unsigned char mapped = graphics_font_map_codepoint(cp);
         graphics_draw_quad(floorf(x) + (size * g_fonts[font].width) * count, floorf(y),
             (size * g_fonts[font].width), (size * g_fonts[font].height),
-            ((int)c % g_fonts[font].length_x) * g_fonts[font].width, ((int)c / g_fonts[font].length_x) * g_fonts[font].height,
+            ((int)mapped % g_fonts[font].length_x) * g_fonts[font].width, ((int)mapped / g_fonts[font].length_x) * g_fonts[font].height,
             g_fonts[font].width, g_fonts[font].height, color);
-        c = text[++count];
+        count++;
     }
 }
 
@@ -1118,12 +1285,12 @@ int graphics_get_formatted_text_length(const char *text, void *item)
 {
     int count = 0;
     int length = 0;
-    unsigned char c = text[0];
-    while (c != 0)
+    while (text[count] != 0)
     {
+        unsigned char c = (unsigned char)text[count];
         if (c == '#')
         {
-            c = text[++count];
+            c = (unsigned char)text[++count];
             if (c == 0) break;
             switch(c)
             {
@@ -1133,22 +1300,17 @@ int graphics_get_formatted_text_length(const char *text, void *item)
                     char str[32];
                     if (c == 'j') game_util_get_joker_hint_value((struct Joker*)item, str);
                     if (c == 't') game_util_get_tarot_hint_value((struct Tarot*)item, str);
-                    char c2 = str[0];
-                    int count2 = 0;
-                    while (c2 != 0)
-                    {
-                        c2 = str[++count2];
-                        length++;
-                    }
+                    length += graphics_count_text_columns_compat(str);
                     break;
                 }
             }
+            count++;
         }
         else
         {
+            (void)graphics_decode_codepoint_compat(text, &count);
             length++;
         }
-        c = text[++count];
     }
 
     return length;
@@ -1156,31 +1318,7 @@ int graphics_get_formatted_text_length(const char *text, void *item)
 
 void graphics_draw_text_formatted_center(int font, const char *text, void *item, float x, float y, float size, uint32_t color)
 {
-    /* Inline measure pass — avoids a separate function call and resolves #j/#t tokens only once here. */
-    int count = 0;
-    int length = 0;
-    unsigned char c = text[0];
-    while (c != 0)
-    {
-        if (c == '#')
-        {
-            c = text[++count];
-            if (c == 0) break;
-            if (c == 'j' || c == 't')
-            {
-                char tmp[32];
-                if (c == 'j') game_util_get_joker_hint_value((struct Joker*)item, tmp);
-                else           game_util_get_tarot_hint_value((struct Tarot*)item, tmp);
-                int i = 0;
-                while (tmp[i]) { length++; i++; }
-            }
-        }
-        else
-        {
-            length++;
-        }
-        c = text[++count];
-    }
+    int length = graphics_get_formatted_text_length(text, item);
     graphics_draw_text_formatted(font, text, item, x - ((float)length / 2.0f * g_fonts[font].width * size), y - (g_fonts[font].height * size / 2.0f), size, color);
 }
 
@@ -1189,6 +1327,10 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
     uint32_t current_color = color;
     uint32_t current_background_color = 0;
 
+#ifdef DEBUG
+    graphics_debug_log_text_bytes("draw_text_formatted", text);
+#endif
+
     graphics_set_texture(g_fonts[font].texture, GRAPHICS_TEXTURE_FILTER_NEAREST);
 
     char str[32];
@@ -1196,12 +1338,12 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
 
     int count = 0;
     int length = 0;
-    unsigned char c = text[0];
-    while (c != 0)
+    while (text[count] != 0)
     {
+        unsigned char c = (unsigned char)text[count];
         if (c == '#')
         {
-            c = text[++count];
+            c = (unsigned char)text[++count];
             if (c == 0) break;
             switch(c)
             {
@@ -1224,10 +1366,14 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
                 {
                     if (c == 'j') game_util_get_joker_hint_value((struct Joker*)item, str);
                     if (c == 't') game_util_get_tarot_hint_value((struct Tarot*)item, str);
-                    char c2 = str[0];
-                    int count2 = 0;
-                    while (c2 != 0)
+#ifdef DEBUG
+                    graphics_debug_log_text_bytes("draw_text_formatted_token", str);
+#endif
+                    int token_index = 0;
+                    while (str[token_index] != 0)
                     {
+                        unsigned int cp = graphics_decode_codepoint_compat(str, &token_index);
+                        unsigned char mapped = graphics_font_map_codepoint(cp);
                         if (current_background_color != 0)
                         {
                             graphics_draw_solid_quad(floorf(x) + (size * g_fonts[font].width) * length, floorf(y),
@@ -1237,14 +1383,14 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
                         }
                         graphics_draw_quad(floorf(x) + (size * g_fonts[font].width) * length, floorf(y),
                             (size * g_fonts[font].width), (size * g_fonts[font].height),
-                            ((int)c2 % g_fonts[font].length_x) * g_fonts[font].width, ((int)c2 / g_fonts[font].length_x) * g_fonts[font].height,
+                            ((int)mapped % g_fonts[font].length_x) * g_fonts[font].width, ((int)mapped / g_fonts[font].length_x) * g_fonts[font].height,
                             g_fonts[font].width, g_fonts[font].height, current_color);
-                        c2 = str[++count2];
                         length++;
                     }
                     break;
                 }
             }
+            count++;
         }
         else
         {
@@ -1257,13 +1403,14 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
 
                 background_start = false;
             }
+            unsigned int cp = graphics_decode_codepoint_compat(text, &count);
+            unsigned char mapped = graphics_font_map_codepoint(cp);
             graphics_draw_quad(floorf(x) + (size * g_fonts[font].width) * length, floorf(y),
                 (size * g_fonts[font].width), (size * g_fonts[font].height),
-                ((int)c % g_fonts[font].length_x) * g_fonts[font].width, ((int)c / g_fonts[font].length_x) * g_fonts[font].height,
+                ((int)mapped % g_fonts[font].length_x) * g_fonts[font].width, ((int)mapped / g_fonts[font].length_x) * g_fonts[font].height,
                 g_fonts[font].width, g_fonts[font].height, current_color);
             length++;            
         }
-        c = text[++count];        
     }
 }
 
