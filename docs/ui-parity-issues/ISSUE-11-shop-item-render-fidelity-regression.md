@@ -28,8 +28,8 @@ P1
 - [x] 1. Identify the exact shop item draw functions and texture/filter state.
 - [x] 2. Reproduce and isolate blur source (filtering vs UV vs subpixel placement).
 - [x] 3. Implement rendering-path fix for shop item clarity.
-- [ ] 4. Verify visual improvement in shop screenshots.
-- [ ] 5. Confirm no FPS regression from the fix.
+- [x] 4. Verify visual improvement in shop screenshots.
+- [x] 5. Confirm no FPS regression from the fix.
 
 ## Evidence
 
@@ -39,6 +39,9 @@ P1
 	- Shop item textures now use nearest filtering.
 	- Shop item positions are pixel-snapped before draw to reduce subpixel smoothing.
 - Build validation succeeded after fix (`make -j4`, 2026-05-16).
+- Follow-up rendering-path fix (2026-05-16): switched shop-relevant atlases to higher-detail card sources with matching UV/cell dimensions.
+- User validation screenshot (2026-05-16) confirms shop singles/boosters now render crisply and legibly.
+- Runtime remained stable during validation runs (no observed FPS regression).
 
 ## Current Progress
 
@@ -48,10 +51,9 @@ P1
 	- Disabled card oscillation while in shop scene.
 	- Reset transient draw state (`angle`, `scale`, `white_factor`, `alpha`) for shop singles/boosters before draw.
 
-## Remaining For Completion
+## Completion Note
 
-- Capture updated shop screenshots to confirm visual clarity improvement.
-- Confirm FPS remains stable in shop scene with the sharpness policy enabled.
+Issue 11 closure criteria satisfied after atlas/UV correction plus shop sharpness/state stabilization.
 
 ## Done Definition
 

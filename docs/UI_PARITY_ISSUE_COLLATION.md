@@ -63,6 +63,10 @@ Primary validation guide:
    - File: docs/ui-parity-issues/ISSUE-10-global-spacing-composition.md
    - Priority: P1
    - Affects: Pregame, Ingame
+11. Shop Item Rendering Fidelity Regression
+   - File: docs/ui-parity-issues/ISSUE-11-shop-item-render-fidelity-regression.md
+   - Priority: P1
+   - Affects: Shop
 
 ## Recommended Delivery Order
 
@@ -105,7 +109,7 @@ Date: 2026-05-16
 
 - Side-by-side validation completed across pregame, ingame, cash-out overlay, and shop scenes.
 - Final screenshot pass confirmed no debug overlay contamination and improved parity composition.
-- Issue trackers ISSUE-01 through ISSUE-10 are marked complete.
+- Issue trackers ISSUE-01 through ISSUE-11 are marked complete.
 
 ## Acceptance Criteria
 
