@@ -1,6 +1,8 @@
 BUILD_PRX=0
 DEBUG=1
 
+.DEFAULT_GOAL := all
+
 PSPSDK=$(shell psp-config --pspsdk-path)
 PSPDIR=$(shell psp-config --psp-prefix)
 

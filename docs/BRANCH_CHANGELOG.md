@@ -18,6 +18,9 @@ This branch turns the project into a more complete menu-driven PSP build with a 
 - Added documentation for the menu workflow, wallpaper setup, and PSP asset optimization plan.
 - Added a permanent main-menu asset showcase that displays the optimized logo, card sheet, effects art, and UI thumbnail assets.
 - Removed temporary runtime verification hooks after the milestone validation pass, leaving only the permanent asset integrations.
+- Applied a parity tuning pass for title/menu composition: textured action buttons, tighter action bar geometry, logo vertical/scale adjustment, lighter button/chip borders, tighter lower-right utility cluster, and subtler top-right version text.
+- Applied a follow-up menu visual pass: restored ace logo lockup, increased logo dominance over center card art, enlarged interactive action buttons, switched to solid fill-first button rendering for stronger color blocks, and improved label readability with layered shadow/highlight text treatment.
+- Added shader-inspired title grading in `src/menu.c` using GU-safe layered quads (vignette, cool tone wash, center readability lift, and top sheen) to approximate post effects without runtime fragment shaders.
 
 ## Milestone Log
 
