@@ -7,7 +7,7 @@
 
 ## Summary
 
-This branch turns the project into a more complete menu-driven PSP build with a structured asset pipeline and PSP-optimized content. The work focused on making Balatro assets accessible, validating them in PPSSPP, and then removing temporary verification hooks after the optimization milestones were complete.
+This branch turns the project into a more complete menu-driven PSP build with a structured asset pipeline and PSP-optimized content. The work focused on making Balatro assets accessible, validating them in PPSSPP, and then using the optimized logo, card, effects, and UI assets in the permanent main-menu presentation after the verification-only hooks were removed.
 
 ## Main Changes
 
@@ -16,7 +16,11 @@ This branch turns the project into a more complete menu-driven PSP build with a 
 - Added PSP-optimized asset sets for UI/logo art, core card sheets, and effects art.
 - Added build-time asset sync so optimized folders are copied into `build/assets/` automatically.
 - Added documentation for the menu workflow, wallpaper setup, and PSP asset optimization plan.
+- Added a permanent main-menu asset showcase that displays the optimized logo, card sheet, effects art, and UI thumbnail assets.
 - Removed temporary runtime verification hooks after the milestone validation pass, leaving only the permanent asset integrations.
+- Applied a parity tuning pass for title/menu composition: textured action buttons, tighter action bar geometry, logo vertical/scale adjustment, lighter button/chip borders, tighter lower-right utility cluster, and subtler top-right version text.
+- Applied a follow-up menu visual pass: restored ace logo lockup, increased logo dominance over center card art, enlarged interactive action buttons, switched to solid fill-first button rendering for stronger color blocks, and improved label readability with layered shadow/highlight text treatment.
+- Added shader-inspired title grading in `src/menu.c` using GU-safe layered quads (vignette, cool tone wash, center readability lift, and top sheen) to approximate post effects without runtime fragment shaders.
 
 ## Milestone Log
 
