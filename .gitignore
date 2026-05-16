@@ -43,3 +43,5 @@ Thumbs.db
 # Copilot/AI artifacts (kept on dedicated branch)
 /.copilot/artifacts/
 !/.copilot/artifacts/README.md
+
+.fake

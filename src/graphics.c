@@ -1008,7 +1008,7 @@ void graphics_set_texture(int texture, int filter)
     else if (texture == -2)
     {
         sceGuEnable(GU_TEXTURE_2D);
-        sceGuTexMode(GU_PSM_4444,0,0,GU_FALSE);
+        sceGuTexMode(GU_PSM_8888,0,0,GU_FALSE);
         sceGuTexImage(0, BUFFER_WIDTH, BUFFER_HEIGHT, BUFFER_WIDTH, sceGeEdramGetAddr() + (int)g_frame_buffer_2);
         sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGB);
         sceGuTexFilter(filter,filter);
@@ -1457,7 +1457,7 @@ void graphics_init()
 
     GU_START();
 
-	sceGuDrawBuffer(GU_PSM_4444, g_frame_buffer_0, BUFFER_WIDTH);
+	sceGuDrawBuffer(GU_PSM_8888, g_frame_buffer_0, BUFFER_WIDTH);
 	sceGuDispBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, g_frame_buffer_1, BUFFER_WIDTH);
 
     sceGuOffset(2048 - (SCREEN_WIDTH/2),2048 - (SCREEN_HEIGHT/2));
@@ -1536,7 +1536,7 @@ void graphics_set_offscreen_render_target()
 {
     graphics_begin_draw();
 
-    sceGuDrawBuffer(GU_PSM_4444, (void*)g_frame_buffer_2, BUFFER_WIDTH);
+    sceGuDrawBuffer(GU_PSM_8888, (void*)g_frame_buffer_2, BUFFER_WIDTH);
     sceGuOffset(2048 - (SCREEN_WIDTH/2),2048 - (256/2));
     sceGuViewport(2048,2048,SCREEN_WIDTH,256);
 	sceGuScissor(0,0,SCREEN_WIDTH,SCREEN_HEIGHT);
@@ -1549,7 +1549,7 @@ void graphics_unset_offscreen_render_target()
 
     graphics_begin_draw();
 
-    sceGuDrawBuffer(GU_PSM_4444, (void*)g_last_frame_buffer, BUFFER_WIDTH);
+    sceGuDrawBuffer(GU_PSM_8888, (void*)g_last_frame_buffer, BUFFER_WIDTH);
     sceGuOffset(2048 - (SCREEN_WIDTH/2),2048 - (SCREEN_HEIGHT/2));
     sceGuViewport(2048,2048,SCREEN_WIDTH,SCREEN_HEIGHT);
 	sceGuScissor(0,0,SCREEN_WIDTH,SCREEN_HEIGHT);

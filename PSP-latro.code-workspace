@@ -10,5 +10,7 @@
 			"path": "../pspdev"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "PSP-latro"
+	}
 }

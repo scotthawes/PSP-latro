@@ -1,6 +1,8 @@
 // menu.c - Title screen and main menu implementation
 // Included as a unity-build unit from main.c
 
+#include "global.h"
+
 // Forward declarations
 static void menu_draw_rect(float x, float y, float w, float h, uint32_t color);
 static void menu_draw_rect_border(float x, float y, float w, float h, uint32_t color, int thickness);
@@ -54,6 +56,7 @@ static int s_main_wallpaper_texture = -1;
 static bool s_wallpapers_initialized = false;
 static int s_wallpaper_variant = 0;
 static int s_title_logo_texture = -1;
+static int s_title_ace_card_texture = -1;
 static int s_profile_icon_texture = -1;
 static int s_language_icon_texture = -1;
 static int s_social_discord_icon_texture = -1;
@@ -67,7 +70,8 @@ static int s_main_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
 static int s_title_logo_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
 
 #define MENU_TITLE_BACKGROUND_PATH "backgrounds/balatro_bg_alt.png"
-#define MENU_TITLE_LOGO_PATH "balatro-ui-optimized/logo_main_psp_ace.png"
+#define MENU_TITLE_LOGO_PATH "balatro-ui-optimized/logo_text_psp.png" // logo text only, no ace
+#define MENU_TITLE_ACE_CARD_PATH "balatro-ui-optimized/ace_spades_psp.png" // ace card only
 #define MENU_TITLE_LOGO_FALLBACK_PATH "balatro-ui-optimized/logo_alt_psp.png"
 #define MENU_PROFILE_ICON_PATH "balatro-ui-optimized/icons/icon_r0_c0.png"
 #define MENU_LANGUAGE_ICON_PATH "balatro-ui-optimized/icons/icon_r0_c1.png"
@@ -142,7 +146,6 @@ static int menu_load_ui_texture(const char *asset_key, const char *path, bool re
     int texture = graphics_load_wallpaper(path);
     if (texture >= 0)
     {
-        DEBUG_PRINTF("[MENU][ASSET] key=%s path=%s texture=%d\n", asset_key, path, texture);
         return texture;
     }
 
@@ -177,7 +180,11 @@ static void menu_load_logo_variant(int variant)
         s_title_logo_textures[variant] = menu_load_ui_texture("title_logo_fallback", MENU_TITLE_LOGO_FALLBACK_PATH, true);
     }
 
-    DEBUG_PRINTF("[MENU] logo variant %d texture=%d\n", variant, s_title_logo_textures[variant]);
+    if (s_title_ace_card_texture < 0)
+    {
+        s_title_ace_card_texture = menu_load_ui_texture("title_ace_card", MENU_TITLE_ACE_CARD_PATH, true);
+    }
+
 }
 
 static void menu_apply_active_variant_assets()
@@ -236,28 +243,10 @@ static void menu_draw_line_h(float x, float y, float w, uint32_t color)
 // Approximate shader-style title grading with GU-safe layered quads.
 static void menu_draw_title_postfx()
 {
-    // Global tone curve: slightly darker with a soft cool cast.
-    menu_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07000000);
-    menu_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x05081016);
-
-    // Vignette strips emulate edge darkening without fragment shaders.
-    for (int i = 0; i < 12; i++)
-    {
-        uint8_t a = (uint8_t)(18 - i);
-        uint32_t edge = ((uint32_t)a << 24);
-
-        menu_draw_rect((float)i, (float)i, SCREEN_WIDTH - (float)(2 * i), 1.0f, edge);
-        menu_draw_rect((float)i, SCREEN_HEIGHT - 1.0f - (float)i, SCREEN_WIDTH - (float)(2 * i), 1.0f, edge);
-        menu_draw_rect((float)i, (float)i, 1.0f, SCREEN_HEIGHT - (float)(2 * i), edge);
-        menu_draw_rect(SCREEN_WIDTH - 1.0f - (float)i, (float)i, 1.0f, SCREEN_HEIGHT - (float)(2 * i), edge);
-    }
-
-    // Central lift keeps logo readable over the busy background swirl.
-    menu_draw_rect(90.0f, 48.0f, 300.0f, 140.0f, 0x0630608C);
-    menu_draw_rect(118.0f, 64.0f, 244.0f, 106.0f, 0x043A6FA2);
-
-    // Top sheen for mild cinematic polish.
-    menu_draw_rect(0.0f, 0.0f, SCREEN_WIDTH, 26.0f, 0x08FFFFFF);
+    // Asset-match tuning: tiny brightness and color lift, no global darkening.
+    menu_draw_rect(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0x05FFFFFF);
+    menu_draw_rect(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0x01FF4A30);
+    menu_draw_rect(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0x011E5CFF);
 }
 
 static void menu_draw_texture_fill(int texture_id, float x, float y, float w, float h, uint32_t tint)
@@ -368,6 +357,31 @@ static void menu_draw_button_label_centered(const char *label, float x, float y,
     graphics_draw_text_center(font, label, cx, cy, scale, style->text);
 }
 
+static void menu_draw_icon_chip(float x, float y, float size, uint32_t fill, uint32_t border, int texture_id)
+{
+    menu_draw_rect(x, y + 1.0f, size, size, 0x1E000000);
+    menu_draw_rect(x, y, size, size, fill);
+    menu_draw_rect(x + 1.0f, y + 1.0f, size - 2.0f, 1.0f, 0x26FFFFFF);
+    menu_draw_rect_border(x, y, size, size, border, 1);
+
+    if (texture_id >= 0)
+    {
+        int icon_w = 0;
+        int icon_h = 0;
+        if (!graphics_get_texture_content_size(texture_id, &icon_w, &icon_h) || icon_w <= 0 || icon_h <= 0)
+        {
+            icon_w = 24;
+            icon_h = 24;
+        }
+
+        float icon_size = size - 4.0f;
+        float icon_x = x + 2.0f;
+        float icon_y = y + 2.0f;
+        graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_LINEAR);
+        graphics_draw_quad(icon_x, icon_y, icon_size, icon_size, 0, 0, icon_w, icon_h, 0xFFFFFFFF);
+    }
+}
+
 static void menu_validate_rect(const char *name, float x, float y, float w, float h)
 {
     if (x < 0.0f || y < 0.0f || (x + w) > SCREEN_WIDTH || (y + h) > SCREEN_HEIGHT)
@@ -406,6 +420,8 @@ static void menu_init_wallpapers()
         s_main_wallpaper_textures[i] = -1;
         s_title_logo_textures[i] = -1;
     }
+    s_title_logo_texture = -1;
+    s_title_ace_card_texture = -1;
 
     s_wallpaper_variant = CLAMP(g_settings.wallpaper_variant, 0, MENU_WALLPAPER_VARIANT_COUNT - 1);
 
@@ -420,10 +436,12 @@ static void menu_init_wallpapers()
     }
     s_title_wallpaper_textures[1] = s_title_wallpaper_textures[0];
 
-    // Prioritize core title art first so fallback text is avoided under tight texture budgets.
+    // Load title logo textures + Ace card at startup so first frame has valid handles.
     menu_load_logo_variant(0);
-    menu_load_logo_variant(s_wallpaper_variant);
-    menu_apply_active_variant_assets();
+    if (s_wallpaper_variant != 0)
+    {
+        menu_load_logo_variant(s_wallpaper_variant);
+    }
 
     // Optional UI chrome loads after core title assets.
     s_profile_icon_texture = menu_load_ui_texture("profile_icon", MENU_PROFILE_ICON_PATH, true);
@@ -459,6 +477,9 @@ static void menu_init_wallpapers()
         DEBUG_PRINTF("[MENU][MISSING] unresolved_ui_assets=%d\n", s_missing_ui_asset_count);
     }
 
+    // Bind active variant textures for first draw.
+    menu_apply_active_variant_assets();
+
     s_wallpapers_initialized = true;
 }
 
@@ -469,12 +490,41 @@ void menu_draw_wallpaper(int texture_id) {
         return;
     }
 
-    // For full-screen menu backgrounds, lock UVs to 480x272 so the image is never sampled as zoomed/cropped.
-    int content_w = SCREEN_WIDTH;
-    int content_h = SCREEN_HEIGHT;
+    int content_w = 0;
+    int content_h = 0;
+    if (!graphics_get_texture_content_size(texture_id, &content_w, &content_h) || content_w <= 0 || content_h <= 0)
+    {
+        content_w = SCREEN_WIDTH;
+        content_h = SCREEN_HEIGHT;
+    }
 
-    graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_LINEAR);
-    graphics_draw_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, content_w, content_h, 0xFFFFFFFF);
+    // Scale-to-fill (cover): maintain aspect ratio and center-crop any excess so
+    // the image fills the screen without stretching or black bars.
+    float src_u = 0.0f, src_v = 0.0f;
+    float src_w = (float)content_w;
+    float src_h = (float)content_h;
+    float img_aspect = (float)content_w / (float)content_h;
+    float scr_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
+
+    if (img_aspect > scr_aspect)
+    {
+        // Image is wider than screen: fit height, center-crop width.
+        src_w = (float)content_h * scr_aspect;
+        src_u = ((float)content_w - src_w) * 0.5f;
+    }
+    else if (img_aspect < scr_aspect)
+    {
+        // Image is taller than screen: fit width, center-crop height.
+        src_h = (float)content_w / scr_aspect;
+        src_v = ((float)content_h - src_h) * 0.5f;
+    }
+
+    // Nearest keeps texel colours from being averaged by bilinear filtering.
+    graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_NEAREST);
+    graphics_draw_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                       (int16_t)src_u, (int16_t)src_v,
+                       (int16_t)src_w, (int16_t)src_h,
+                       0xFFFFFFFF);
 }
 
 // ----------------------------------------------------------------
@@ -482,41 +532,64 @@ void menu_draw_wallpaper(int texture_id) {
 // ----------------------------------------------------------------
 static void menu_draw_title()
 {
+    const float title_logo_scale = 1.00f;
+    const float title_logo_y = 75.0f;
+    const float title_ace_scale = 0.50f;
+    const float title_ace_y_offset = 40.0f;
+
     menu_init_wallpapers();
     menu_draw_wallpaper(s_title_wallpaper_texture);
 
     // Shader-inspired grade/vignette pass using layered GU quads.
     menu_draw_title_postfx();
 
+    // --- Draw logo text ---
+    float logo_x = 0, logo_y = 0, logo_draw_w = 0, logo_draw_h = 0;
+    int logo_drawn = 0;
+    int logo_w = 0, logo_h = 0;
     if (s_title_logo_texture >= 0)
     {
-        int logo_w = 0;
-        int logo_h = 0;
         if (!graphics_get_texture_content_size(s_title_logo_texture, &logo_w, &logo_h))
         {
             logo_w = 185;
             logo_h = 120;
         }
-
-        // Scale logo to properly display Ace card as key visual element
-        float logo_scale = 1.42f;
-        float logo_draw_w = logo_w * logo_scale;
-        float logo_draw_h = logo_h * logo_scale;
-        float logo_x = (SCREEN_WIDTH - logo_draw_w) * 0.5f;
-        float logo_y = 8.0f;
+        float logo_scale = title_logo_scale;
+        logo_draw_w = logo_w * logo_scale;
+        logo_draw_h = logo_h * logo_scale;
+        logo_x = (SCREEN_WIDTH - logo_draw_w) * 0.5f;
+        logo_y = title_logo_y;
         menu_validate_rect("title_logo", logo_x, logo_y, logo_draw_w, logo_draw_h);
-
-        graphics_set_texture(s_title_logo_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
-        graphics_draw_quad(logo_x + 1.0f, logo_y + 1.0f, logo_draw_w, logo_draw_h, 0, 0, logo_w, logo_h, 0x77000000);
         graphics_set_texture(s_title_logo_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
         graphics_draw_quad(logo_x, logo_y, logo_draw_w, logo_draw_h, 0, 0, logo_w, logo_h, 0xFFFFFFFF);
+        logo_drawn = 1;
     }
     else
     {
-        // Deterministic fallback lockup when logo texture is unavailable.
+        // Fallback: draw text
         graphics_draw_text_center(font_big, "BALATRO", SCREEN_WIDTH / 2.0f + 2.0f, 54.0f, 3.0f, 0xAA000000);
         graphics_draw_text_center(font_big, "BALATRO", SCREEN_WIDTH / 2.0f, 52.0f, 3.0f, 0xFFE7EEF5);
         graphics_draw_text_center(font_big, "A S P A D E S S T R A T E G Y G A M E", SCREEN_WIDTH / 2.0f, 92.0f, 0.8f, 0xFFC8D6E8);
+    }
+
+    // --- Draw Ace card independently (after logo, so we can use logo_y) ---
+    if (s_title_ace_card_texture >= 0 && logo_drawn)
+    {
+        int ace_w = 0, ace_h = 0;
+        if (!graphics_get_texture_content_size(s_title_ace_card_texture, &ace_w, &ace_h))
+        {
+            ace_w = 71;
+            ace_h = 95;
+        }
+        float ace_scale = title_ace_scale;
+        float ace_draw_w = ace_w * ace_scale;
+        float ace_draw_h = ace_h * ace_scale;
+        // Center on logo lockup and keep card fully visible at top.
+        float ace_x = (SCREEN_WIDTH - ace_draw_w) * 0.5f;
+        float ace_y = logo_y + title_ace_y_offset;
+        menu_validate_rect("title_ace_card", ace_x, ace_y, ace_draw_w, ace_draw_h);
+        graphics_set_texture(s_title_ace_card_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+        graphics_draw_quad(ace_x, ace_y, ace_draw_w, ace_draw_h, 0, 0, ace_w, ace_h, 0xFFFFFFFF);
     }
 
     bool show_main_menu_chrome = g_game_state.sub_stage == GAME_SUBSTAGE_MENU_MAIN;
@@ -531,18 +604,18 @@ static void menu_draw_title()
     {
         // Bottom action bar
         float bar_x = 72.0f;
-        float bar_y = 228.0f;
+        float bar_y = 230.0f;
         float bar_w = SCREEN_WIDTH - 144.0f;
-        float bar_h = 30.0f;
+        float bar_h = 27.0f;
         menu_draw_rect(bar_x, bar_y, bar_w, bar_h, 0x9E171717);
         menu_draw_rect_border(bar_x, bar_y, bar_w, bar_h, 0xFF3A3A3A, 1);
         menu_validate_rect("action_bar", bar_x, bar_y, bar_w, bar_h);
 
-        float button_gap = 5.0f;
-        float button_w = (bar_w - 10.0f - (MENU_MAIN_ITEM_COUNT - 1) * button_gap) / MENU_MAIN_ITEM_COUNT;
-        float button_h = 22.0f;
-        float button_y = bar_y + 4.0f;
-        float button_x = bar_x + 5.0f;
+        float button_gap = 4.0f;
+        float button_w = (bar_w - 8.0f - (MENU_MAIN_ITEM_COUNT - 1) * button_gap) / MENU_MAIN_ITEM_COUNT;
+        float button_h = 20.0f;
+        float button_y = bar_y + 3.0f;
+        float button_x = bar_x + 4.0f;
 
         for (int i = 0; i < MENU_MAIN_ITEM_COUNT; i++)
         {
@@ -557,9 +630,9 @@ static void menu_draw_title()
 
         // Profile panel (bottom-left)
         float profile_x = 20.0f;
-        float profile_y = 228.0f;
-        float profile_w = 52.0f;
-        float profile_h = 24.0f;
+        float profile_y = 230.0f;
+        float profile_w = 50.0f;
+        float profile_h = 22.0f;
         struct MenuButtonStyle profile_style = menu_get_button_style(MENU_BUTTON_KIND_PROFILE, false);
         menu_draw_button_widget(profile_x, profile_y, profile_w, profile_h, -1, &profile_style);
         menu_validate_rect("profile_panel", profile_x, profile_y, profile_w, profile_h);
@@ -580,10 +653,10 @@ static void menu_draw_title()
         }
 
         // Language selector chip (bottom-right)
-        float lang_w = 64.0f;
-        float lang_h = 16.0f;
+        float lang_w = 62.0f;
+        float lang_h = 15.0f;
         float lang_x = SCREEN_WIDTH - 16.0f - lang_w;
-        float lang_y = 241.0f;
+        float lang_y = 242.0f;
         struct MenuButtonStyle lang_style = menu_get_button_style(MENU_BUTTON_KIND_LANGUAGE, false);
         menu_draw_button_widget(lang_x, lang_y, lang_w, lang_h, -1, &lang_style);
         menu_validate_rect("language_chip", lang_x, lang_y, lang_w, lang_h);
@@ -603,51 +676,16 @@ static void menu_draw_title()
         }
 
         // Utility/social icon chips near lower-right cluster
-        float social_y = 219.0f;
-        float social_size = 16.0f;
-        float social_gap = 4.0f;
+        float social_y = 218.0f;
+        float social_size = 15.0f;
+        float social_gap = 3.0f;
         float social_x_right = SCREEN_WIDTH - 16.0f - social_size;
         float social_x_left = social_x_right - social_gap - social_size;
 
-        struct MenuButtonStyle social_style = menu_get_button_style(MENU_BUTTON_KIND_LANGUAGE, false);
-        menu_draw_button_widget(social_x_left, social_y, social_size, social_size, -1, &social_style);
-        menu_draw_button_widget(social_x_right, social_y, social_size, social_size, -1, &social_style);
+        menu_draw_icon_chip(social_x_left, social_y, social_size, 0xFF4B79BF, 0xFFD3E4FA, s_social_discord_icon_texture);
+        menu_draw_icon_chip(social_x_right, social_y, social_size, 0xFF2A2E36, 0xFFE2E7EF, s_social_x_icon_texture);
         menu_validate_rect("social_left_chip", social_x_left, social_y, social_size, social_size);
         menu_validate_rect("social_right_chip", social_x_right, social_y, social_size, social_size);
-
-        if (s_social_discord_icon_texture >= 0)
-        {
-            int iw = 0;
-            int ih = 0;
-            if (!graphics_get_texture_content_size(s_social_discord_icon_texture, &iw, &ih) || iw <= 0 || ih <= 0)
-            {
-                iw = 24;
-                ih = 24;
-            }
-            graphics_set_texture(s_social_discord_icon_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
-            graphics_draw_quad(social_x_left + 2.0f, social_y + 2.0f, 12.0f, 12.0f, 0, 0, iw, ih, 0xFFFFFFFF);
-        }
-        else
-        {
-            graphics_draw_text_center(font_small, "D", social_x_left + social_size * 0.5f, social_y + 4.0f, 0.60f, 0xFFE8E8FF);
-        }
-
-        if (s_social_x_icon_texture >= 0)
-        {
-            int iw = 0;
-            int ih = 0;
-            if (!graphics_get_texture_content_size(s_social_x_icon_texture, &iw, &ih) || iw <= 0 || ih <= 0)
-            {
-                iw = 24;
-                ih = 24;
-            }
-            graphics_set_texture(s_social_x_icon_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
-            graphics_draw_quad(social_x_right + 2.0f, social_y + 2.0f, 12.0f, 12.0f, 0, 0, iw, ih, 0xFFFFFFFF);
-        }
-        else
-        {
-            graphics_draw_text_center(font_small, "X", social_x_right + social_size * 0.5f, social_y + 4.0f, 0.60f, 0xFFE8E8FF);
-        }
     }
 
     // Minimal top-right version label (no heavy chip)

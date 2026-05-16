@@ -51,19 +51,40 @@ This is a separate track from the previously closed parity set (ISSUE-01 through
    - Affects: Menu Modals
    - Current status: partial complete; run setup modal parity deferred to larger feature work
 
+8. Title and Main Menu Layout Parity Gap
+   - File: docs/ui-comparison-issues/ISSUE-08-title-main-menu-layout-parity-gap.md
+   - Priority: P1
+   - Affects: Title, Menu
+
+9. Settings and Tabbed Dialog Structure Gap
+   - File: docs/ui-comparison-issues/ISSUE-09-settings-and-tabbed-dialog-structure-gap.md
+   - Priority: P1
+   - Affects: Menu Modals
+
+10. Language and Credits Panel Parity Gap
+   - File: docs/ui-comparison-issues/ISSUE-10-language-and-credits-panel-parity-gap.md
+   - Priority: P2
+   - Affects: Menu Modals
+
+11. Run Setup and Game Over Modal Parity Gap
+   - File: docs/ui-comparison-issues/ISSUE-11-run-setup-and-game-over-modal-parity-gap.md
+   - Priority: P1
+   - Affects: Menu Modals
+
 ## Recommended Delivery Order
 
 1. P0 first: ISSUE-01
 2. Pregame/ingame foundations: ISSUE-03, ISSUE-02, ISSUE-04
 3. Composition polish: ISSUE-05
-4. Menu and modal parity: ISSUE-06, ISSUE-07
-5. Full comparison rerun and signoff
+5. Menu and modal parity: ISSUE-06, ISSUE-07, ISSUE-08, ISSUE-09, ISSUE-10, ISSUE-11
+6. Full comparison rerun and signoff
 
 ## Cross-Issue Dependencies
 
 - ISSUE-01 gates all UI readability checks.
 - ISSUE-03 influences perceived quality of ISSUE-02 and ISSUE-04.
 - ISSUE-06 and ISSUE-07 should be validated with the same capture profile to avoid false diffs.
+- ISSUE-07 through ISSUE-11 should be validated with the same capture profile to avoid false diffs.
 
 ## Validation Source Set
 
@@ -94,8 +115,9 @@ Reference images and clips are under assets/ui_db/:
 - [x] 5. Improve table/background depth while preserving readability.
 - [x] 6. Validate title and main menu composition against references.
 - [ ] 7. Validate settings/language/credits/run setup/game over modal parity.
-- [ ] 8. Capture fresh rerun screenshots and attach evidence.
-- [ ] 9. Perform side-by-side signoff and close all open items.
+- [ ] 8. Validate title and main menu parity in the same capture pass.
+- [ ] 9. Capture fresh rerun screenshots and attach evidence.
+- [ ] 10. Perform side-by-side signoff and close all open items.
 
 ## Primary Test Plan
 
