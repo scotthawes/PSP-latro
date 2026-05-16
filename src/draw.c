@@ -30,6 +30,7 @@ static void fmt_num(char *buf, double n)
 #define PSP_TEX_CARD_HEIGHT  23
 
 int tex_enhancers, tex_deck, tex_deck2, tex_gamepad_ui, tex_editions, tex_shop, tex_ui_assets;
+int tex_blind_background;
 int tex_jokers[2][4];
 int tex_tarots[2][2];
 int tex_boosters[2];
@@ -64,6 +65,13 @@ static const struct BlindPanelStyle *game_get_blind_panel_style(int blind)
 #define ACTION_BUTTON_FOCUS_PAD        2.0f
 #define ACTION_BUTTON_BORDER_PAD       1.0f
 #define ACTION_BUTTON_ICON_SIZE        16.0f
+
+#define HAND_ACTION_PRIMARY_WIDTH      86.0f
+#define HAND_ACTION_PRIMARY_HEIGHT     24.0f
+#define HAND_ACTION_SORT_WIDTH         92.0f
+#define HAND_ACTION_SORT_HEIGHT        28.0f
+#define HAND_ACTION_ROW_GAP            12.0f
+#define HAND_ACTION_ROW_Y_OFFSET       3.0f
 
 static void game_draw_action_button(float x, float y, float width, float height,
     const char *text, const char *text2,
@@ -135,6 +143,47 @@ static int game_load_texture_16bit_with_fallback(const char *asset_key, const ch
         DEBUG_PRINTF("[DRAW][ASSET][MISSING] key=%s primary=%s fallback=%s\n", asset_key, primary_path, fallback_path);
     }
     return texture;
+}
+
+static void game_draw_static_background_texture(int texture)
+{
+    int tex_width = 0;
+    int tex_height = 0;
+    if (!graphics_get_texture_content_size(texture, &tex_width, &tex_height) || tex_width <= 0 || tex_height <= 0)
+    {
+        return;
+    }
+
+    float screen_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
+    float tex_aspect = (float)tex_width / (float)tex_height;
+
+    int16_t u = 0;
+    int16_t v = 0;
+    int16_t uw = (int16_t)tex_width;
+    int16_t vh = (int16_t)tex_height;
+
+    if (tex_aspect > screen_aspect)
+    {
+        int crop_width = (int)((float)tex_height * screen_aspect);
+        if (crop_width < 1) crop_width = 1;
+        if (crop_width > tex_width) crop_width = tex_width;
+        u = (int16_t)((tex_width - crop_width) / 2);
+        uw = (int16_t)crop_width;
+    }
+    else if (tex_aspect < screen_aspect)
+    {
+        int crop_height = (int)((float)tex_width / screen_aspect);
+        if (crop_height < 1) crop_height = 1;
+        if (crop_height > tex_height) crop_height = tex_height;
+        v = (int16_t)((tex_height - crop_height) / 2);
+        vh = (int16_t)crop_height;
+    }
+
+    graphics_set_texture(texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
+    graphics_draw_quad(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT,
+        u, v, uw, vh,
+        COLOR_WHITE);
+    graphics_set_no_texture();
 }
 
 static struct Image game_load_image_with_fallback(const char *asset_key, const char *primary_path, const char *fallback_path)
@@ -302,6 +351,20 @@ bool game_init_draw()
 
     tex_ui_assets = game_load_texture_16bit_with_fallback("ui_assets", "resources/textures/1x/ui_assets.png", "balatro-textures/1x/ui_assets.png");
     if (tex_ui_assets < 0) return false;
+
+    tex_blind_background = graphics_load_wallpaper("assets/wallpapers/galaxy_15_psp.png");
+    if (tex_blind_background < 0)
+    {
+        tex_blind_background = graphics_load_wallpaper("assets/wallpapers/galaxy_15.webp");
+    }
+    if (tex_blind_background < 0)
+    {
+        tex_blind_background = graphics_load_wallpaper("assets/wallpapers/galaxy_15.jpeg");
+    }
+    if (tex_blind_background < 0)
+    {
+        DEBUG_PRINTF("[DRAW][ASSET][MISSING] key=blind_background paths=galaxy_15_psp.png|galaxy_15.webp|galaxy_15.jpeg\n");
+    }
 
     sceKernelDcacheWritebackInvalidateAll();
 
@@ -1092,37 +1155,42 @@ void game_draw_ingame_hand()
     if (game_get_hand_y() == DRAW_HAND_Y)
     {
         graphics_set_no_texture();
-        float x = DRAW_HAND_X + (DRAW_HAND_WIDTH / 2.0f) - 40.0f;
-        float y = DRAW_HAND_Y + CARD_HEIGHT;
-        graphics_draw_quad(x, y, 80.0f, 30.0f, 0, 0, 0, 0, COLOR_DARK_GREY);
-        graphics_draw_text_center(font_small, "Sort Hand", x + 40.0f, y + 7.0f, 1.0f, COLOR_WHITE);
+        float x = DRAW_HAND_X + (DRAW_HAND_WIDTH / 2.0f) - (HAND_ACTION_SORT_WIDTH / 2.0f);
+        float y = DRAW_HAND_Y + CARD_HEIGHT + HAND_ACTION_ROW_Y_OFFSET;
+        graphics_draw_quad(x, y, HAND_ACTION_SORT_WIDTH, HAND_ACTION_SORT_HEIGHT, 0, 0, 0, 0, COLOR_DARK_GREY_2);
+        graphics_draw_quad(x + 1.0f, y + 1.0f, HAND_ACTION_SORT_WIDTH - 2.0f, HAND_ACTION_SORT_HEIGHT - 2.0f, 0, 0, 0, 0, COLOR_DARK_GREY);
+        graphics_draw_text_center(font_small, "Sort Hand", x + (HAND_ACTION_SORT_WIDTH / 2.0f), y + 7.0f, 1.0f, COLOR_WHITE);
         graphics_set_no_texture();
         if (g_game_state.input_focused_zone == INPUT_FOCUSED_ZONE_SORT_HAND_RANK)
         {
-            graphics_draw_quad(x + 1.0f, y + 13.0f, 37.0f, 16.0f, 0, 0, 0, 0, COLOR_WHITE);
+            graphics_draw_quad(x + 3.0f, y + 13.0f, 41.0f, 14.0f, 0, 0, 0, 0, COLOR_WHITE);
         }
-        graphics_draw_quad(x + 3.0f, y + 14.0f, 34.0f, 14.0f, 0, 0, 0, 0, 0xFF0097FC);        
-        graphics_draw_text_center(font_small, "Rank", x + 20.0f, y + 20.0f, 1.0f, COLOR_WHITE);
+        graphics_draw_quad(x + 5.0f, y + 14.0f, 37.0f, 12.0f, 0, 0, 0, 0, 0xFF6B7686);
+        graphics_draw_quad(x + 6.0f, y + 15.0f, 35.0f, 10.0f, 0, 0, 0, 0, 0xFF343943);
+        graphics_draw_quad(x + 6.0f, y + 15.0f, 35.0f, 10.0f, 0, 0, 0, 0, 0xFF008CC8);
+        graphics_draw_text_center(font_small, "Rank", x + 23.0f, y + 20.0f, 1.0f, COLOR_WHITE);
         graphics_set_no_texture();
         if (g_game_state.input_focused_zone == INPUT_FOCUSED_ZONE_SORT_HAND_SUIT)
         {
-            graphics_draw_quad(x + 41.0f, y + 13.0f, 37.0f, 16.0f, 0, 0, 0, 0, COLOR_WHITE);
+            graphics_draw_quad(x + 48.0f, y + 13.0f, 41.0f, 14.0f, 0, 0, 0, 0, COLOR_WHITE);
         }
-        graphics_draw_quad(x + 43.0f, y + 14.0f, 34.0f, 14.0f, 0, 0, 0, 0, 0xFF0097FC);
-        graphics_draw_text_center(font_small, "Suit", x + 62.0f, y + 20.0f, 1.0f, COLOR_WHITE);
+        graphics_draw_quad(x + 50.0f, y + 14.0f, 37.0f, 12.0f, 0, 0, 0, 0, 0xFF6B7686);
+        graphics_draw_quad(x + 51.0f, y + 15.0f, 35.0f, 10.0f, 0, 0, 0, 0, 0xFF343943);
+        graphics_draw_quad(x + 51.0f, y + 15.0f, 35.0f, 10.0f, 0, 0, 0, 0, 0xFF008CC8);
+        graphics_draw_text_center(font_small, "Suit", x + 68.0f, y + 20.0f, 1.0f, COLOR_WHITE);
 
         // Play Hand
-        x = DRAW_HAND_X + (DRAW_HAND_WIDTH / 2.0f) - 120.0f;
-        y = DRAW_HAND_Y + CARD_HEIGHT + 2.0f;
-        game_draw_action_button(x, y, 78.0f, 26.0f,
+        x = (DRAW_HAND_X + (DRAW_HAND_WIDTH / 2.0f)) - HAND_ACTION_SORT_WIDTH / 2.0f - HAND_ACTION_ROW_GAP - HAND_ACTION_PRIMARY_WIDTH;
+        y = DRAW_HAND_Y + CARD_HEIGHT + HAND_ACTION_ROW_Y_OFFSET + 2.0f;
+        game_draw_action_button(x, y, HAND_ACTION_PRIMARY_WIDTH, HAND_ACTION_PRIMARY_HEIGHT,
             "Play Hand", NULL,
             GAMEPAD_UI_SQUARE, false,
             COLOR_LIGHT_BLUE,
             g_game_state.input_focused_zone == INPUT_FOCUSED_ZONE_HAND_PLAY);
 
         // Discard
-        x = DRAW_HAND_X + (DRAW_HAND_WIDTH / 2.0f) + 42.0f;
-        game_draw_action_button(x, y, 78.0f, 26.0f,
+        x = (DRAW_HAND_X + (DRAW_HAND_WIDTH / 2.0f)) + HAND_ACTION_SORT_WIDTH / 2.0f + HAND_ACTION_ROW_GAP;
+        game_draw_action_button(x, y, HAND_ACTION_PRIMARY_WIDTH, HAND_ACTION_PRIMARY_HEIGHT,
             "Discard", NULL,
             GAMEPAD_UI_TRIANGLE, true,
             COLOR_LIGHT_RED,
@@ -1214,12 +1282,30 @@ void game_draw_deck()
 #define LAYOUT_MID_CLUSTER_Y     90.0f
 #define LAYOUT_PANEL_GAP         8.0f
 
-#define HUD_BG_COLOR            0xFF585858
-#define HUD_SECTION_BG_COLOR    0xFF4A4A4A
-#define HUD_VALUE_BG_COLOR      0xFF3B3B3B
-#define HUD_VALUE_ACCENT_COLOR  0xFF6E6E6E
-#define HUD_LABEL_COLOR         0xFFDCDCDC
-#define HUD_META_COLOR          0xFFC8C8C8
+#define HUD_BG_COLOR            0xFF42474F
+#define HUD_RAIL_INNER_COLOR    0xFF3A3F47
+#define HUD_SECTION_BORDER      0xFF2F343C
+#define HUD_SECTION_BG_COLOR    0xFF4A4F58
+#define HUD_SECTION_TOPBAR      0xFF5A616B
+#define HUD_VALUE_BG_COLOR      0xFF343943
+#define HUD_VALUE_ACCENT_COLOR  0xFF6B7686
+#define HUD_LABEL_COLOR         0xFFE1E3E6
+#define HUD_META_COLOR          0xFFC9CFD8
+
+static void game_draw_hud_section(float x, float y, float w, float h)
+{
+    graphics_set_no_texture();
+    graphics_draw_quad(x, y, w, h, 0, 0, 0, 0, HUD_SECTION_BORDER);
+    graphics_draw_quad(x + 1.0f, y + 1.0f, w - 2.0f, h - 2.0f, 0, 0, 0, 0, HUD_SECTION_BG_COLOR);
+    graphics_draw_quad(x + 1.0f, y + 1.0f, w - 2.0f, 4.0f, 0, 0, 0, 0, HUD_SECTION_TOPBAR);
+}
+
+static void game_draw_hud_value_box(float x, float y, float w, float h)
+{
+    graphics_set_no_texture();
+    graphics_draw_quad(x, y, w, h, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
+    graphics_draw_quad(x + 1.0f, y + 1.0f, w - 2.0f, h - 2.0f, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
+}
 
 void game_draw_left_info()
 {
@@ -1228,8 +1314,11 @@ void game_draw_left_info()
 
     graphics_set_no_texture();
     graphics_draw_quad(2, 2, DRAW_LEFT_INFO_WIDTH, SCREEN_HEIGHT - 4, 0, 0, 0, 0, HUD_BG_COLOR);
+    graphics_draw_quad(4, 4, DRAW_LEFT_INFO_WIDTH - 4, SCREEN_HEIGHT - 8, 0, 0, 0, 0, HUD_RAIL_INNER_COLOR);
 
     int y = 10.0f;
+
+    game_draw_hud_section(4.0f, y - 6.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 52.0f);
 
     switch (g_game_state.stage)
     {
@@ -1256,7 +1345,7 @@ void game_draw_left_info()
                     break;
             }
             y += 12;
-            graphics_draw_text(font_small, "Score at least", 6, y, 1.0f, COLOR_WHITE);
+            graphics_draw_text(font_small, "Score at least", 6, y, 1.0f, HUD_LABEL_COLOR);
             y += 8;
             fmt_num(str, game_get_current_blind_score());
             graphics_draw_text(font_big, str, 6, y, 1.0f, COLOR_WHITE);
@@ -1270,7 +1359,7 @@ void game_draw_left_info()
             if (shop_anim > 3) shop_anim = 0;
 
             graphics_set_texture(tex_shop, GRAPHICS_TEXTURE_FILTER_LINEAR);
-            graphics_draw_quad(4.0f, y - 8.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 50.0f, 113 * shop_anim, 0, 113, 57, COLOR_WHITE);
+            graphics_draw_quad(5.0f, y - 5.0f, DRAW_LEFT_INFO_WIDTH - 6.0f, 46.0f, 113 * shop_anim, 0, 113, 57, COLOR_WHITE);
             y += 44;
             break;
         }
@@ -1281,15 +1370,12 @@ void game_draw_left_info()
         }
     }
 
-    graphics_set_no_texture();
-    graphics_draw_quad(4, y - 2, DRAW_LEFT_INFO_WIDTH - 4, 30, 0, 0, 0, 0, HUD_SECTION_BG_COLOR);
+    game_draw_hud_section(4.0f, y - 2.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 30.0f);
 
     graphics_draw_text(font_big, "Round Score", 6, y, 1.0f, COLOR_WHITE);    
     
     y += 12;
-    graphics_set_no_texture();
-    graphics_draw_quad(6, y, 88, 12, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
-    graphics_draw_quad(7, y + 1, 86, 10, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
+    game_draw_hud_value_box(6.0f, y, 88.0f, 12.0f);
     y += 2;
     fmt_num(str, g_game_state.score);
     graphics_draw_text_center(font_big, str, 2.0f + (DRAW_LEFT_INFO_WIDTH / 2.0f), y + 4, 1.0f, COLOR_WHITE);
@@ -1297,8 +1383,7 @@ void game_draw_left_info()
 
     y += 22;
 
-    graphics_set_no_texture();
-    graphics_draw_quad(4, y - 2, DRAW_LEFT_INFO_WIDTH - 4, 36, 0, 0, 0, 0, HUD_SECTION_BG_COLOR);
+    game_draw_hud_section(4.0f, y - 2.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 36.0f);
     // Draw poker hand
     graphics_draw_text_center(font_small, g_poker_hand_names[g_game_state.current_poker_hand], DRAW_LEFT_INFO_WIDTH / 2.0f, y + 4.0f, 1.0f, HUD_LABEL_COLOR);
     // Draw poker hand level
@@ -1332,17 +1417,13 @@ void game_draw_left_info()
     graphics_draw_text_center(font_small, str, 2.0f + 3.0f * (DRAW_LEFT_INFO_WIDTH / 4.0f), y + 4.0f, 1.0f, COLOR_WHITE);
 
     y += 22;
-    graphics_set_no_texture();
-    graphics_draw_quad(4, y - 4, DRAW_LEFT_INFO_WIDTH - 4, 32, 0, 0, 0, 0, HUD_SECTION_BG_COLOR);    
+    game_draw_hud_section(4.0f, y - 4.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 32.0f);
 
     graphics_draw_text(font_small, "Hands", 10, y, 1.0f, HUD_LABEL_COLOR);
     graphics_draw_text(font_small, "Discards", 48, y, 1.0f, HUD_LABEL_COLOR);
     y += 15;
-    graphics_set_no_texture();
-    graphics_draw_quad(8, y - 2, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8, 11, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
-    graphics_draw_quad((DRAW_LEFT_INFO_WIDTH / 2.0f) + 4, y - 2, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8, 11, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
-    graphics_draw_quad(9, y - 1, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 10, 9, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
-    graphics_draw_quad((DRAW_LEFT_INFO_WIDTH / 2.0f) + 5, y - 1, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 10, 9, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
+    game_draw_hud_value_box(8.0f, y - 2.0f, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8.0f, 11.0f);
+    game_draw_hud_value_box((DRAW_LEFT_INFO_WIDTH / 2.0f) + 4.0f, y - 2.0f, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8.0f, 11.0f);
 
     sprintf(str, "%d", g_game_state.current_hands);
     graphics_draw_text_center(font_small, str, 2.0f + DRAW_LEFT_INFO_WIDTH / 4.0f, y + 4, 1.0f, COLOR_TEXT_BLUE);
@@ -1350,26 +1431,20 @@ void game_draw_left_info()
     graphics_draw_text_center(font_small, str, 3.0f * (DRAW_LEFT_INFO_WIDTH / 4.0f), y + 4, 1.0f, COLOR_LIGHT_RED);
 
     y += 21;
-    graphics_set_no_texture();
-    graphics_draw_quad(4, y - 6, DRAW_LEFT_INFO_WIDTH - 4, 19, 0, 0, 0, 0, HUD_SECTION_BG_COLOR);
-    graphics_draw_quad(8, y - 2, DRAW_LEFT_INFO_WIDTH - 12, 11, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
-    graphics_draw_quad(9, y - 1, DRAW_LEFT_INFO_WIDTH - 14, 9, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
+    game_draw_hud_section(4.0f, y - 6.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 19.0f);
+    game_draw_hud_value_box(8.0f, y - 2.0f, DRAW_LEFT_INFO_WIDTH - 12.0f, 11.0f);
 
     sprintf(str, "$%d", g_game_state.wealth);
     graphics_draw_text_center(font_big, str, DRAW_LEFT_INFO_WIDTH / 2, y + 4.0f, 1.0f, COLOR_TEXT_YELLOW);
 
     y += 20;
-    graphics_set_no_texture();
-    graphics_draw_quad(4, y - 4, DRAW_LEFT_INFO_WIDTH - 4, 32, 0, 0, 0, 0, HUD_SECTION_BG_COLOR);    
+    game_draw_hud_section(4.0f, y - 4.0f, DRAW_LEFT_INFO_WIDTH - 4.0f, 32.0f);
 
     graphics_draw_text_center(font_small, "Ante", 2.0f + DRAW_LEFT_INFO_WIDTH / 4.0f, y + 4, 1.0f, HUD_LABEL_COLOR);
     graphics_draw_text_center(font_small, "Round", 3.0f * (DRAW_LEFT_INFO_WIDTH / 4.0f), y + 4, 1.0f, HUD_LABEL_COLOR);
     y += 15;
-    graphics_set_no_texture();
-    graphics_draw_quad(8, y - 2, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8, 11, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
-    graphics_draw_quad((DRAW_LEFT_INFO_WIDTH / 2.0f) + 4, y - 2, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8, 11, 0, 0, 0, 0, HUD_VALUE_ACCENT_COLOR);
-    graphics_draw_quad(9, y - 1, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 10, 9, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
-    graphics_draw_quad((DRAW_LEFT_INFO_WIDTH / 2.0f) + 5, y - 1, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 10, 9, 0, 0, 0, 0, HUD_VALUE_BG_COLOR);
+    game_draw_hud_value_box(8.0f, y - 2.0f, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8.0f, 11.0f);
+    game_draw_hud_value_box((DRAW_LEFT_INFO_WIDTH / 2.0f) + 4.0f, y - 2.0f, (DRAW_LEFT_INFO_WIDTH / 2.0f) - 8.0f, 11.0f);
 
     sprintf(str, "#5%d#-/8", g_game_state.ante);
     graphics_draw_text_formatted_center(font_big, str, NULL, 2.0f + DRAW_LEFT_INFO_WIDTH / 4.0f, y + 4, 1.0f, COLOR_WHITE);
@@ -1731,28 +1806,31 @@ void game_draw_blind_select()
         const struct BlindPanelStyle *style = game_get_blind_panel_style(i);
         graphics_set_no_texture();
 
-        float y = LAYOUT_MID_CLUSTER_Y;
-        float panel_height = SCREEN_HEIGHT - y;
+        float panel_top = LAYOUT_MID_CLUSTER_Y;
+        float panel_height = SCREEN_HEIGHT - panel_top;
         bool is_selected = i == g_game_state.blind;
         bool is_focused = is_selected && g_game_state.input_focused_zone == INPUT_FOCUSED_ZONE_BLIND;
 
         if (is_focused)
         {
-            graphics_draw_quad(x - 2.0f, y - 2.0f, panel_width + 4.0f, panel_height + 4.0f, 0, 0, 0, 0, COLOR_WHITE);
+            graphics_draw_quad(x - 2.0f, panel_top - 2.0f, panel_width + 4.0f, panel_height + 4.0f, 0, 0, 0, 0, COLOR_WHITE);
         }
 
-        graphics_draw_quad(x - 1.0f, y - 1.0f, panel_width + 2.0f, panel_height + 2.0f, 0, 0, 0, 0, style->border_color);
-        graphics_draw_quad(x, y, panel_width, panel_height, 0, 0, 0, 0, style->panel_fill);
-        graphics_draw_quad(x + 1.0f, y + 1.0f, panel_width - 2.0f, 14.0f, 0, 0, 0, 0, style->header_fill);
-        graphics_draw_quad(x + 1.0f, y + 30.0f, panel_width - 2.0f, 1.0f, 0, 0, 0, 0, style->border_color);
+        graphics_draw_quad(x - 1.0f, panel_top - 1.0f, panel_width + 2.0f, panel_height + 2.0f, 0, 0, 0, 0, style->border_color);
+        graphics_draw_quad(x, panel_top, panel_width, panel_height, 0, 0, 0, 0, style->panel_fill);
+        graphics_draw_quad(x + 1.0f, panel_top + 1.0f, panel_width - 2.0f, 14.0f, 0, 0, 0, 0, style->header_fill);
+        graphics_draw_quad(x + 2.0f, panel_top + 18.0f, panel_width - 4.0f, panel_height - 22.0f, 0, 0, 0, 0, 0x22101010);
+        graphics_draw_quad(x + 1.0f, panel_top + 30.0f, panel_width - 2.0f, 1.0f, 0, 0, 0, 0, style->border_color);
 
         if (!is_selected)
         {
             // Keep unavailable blinds visibly distinct without losing text readability.
-            graphics_draw_quad(x, y, panel_width, panel_height, 0, 0, 0, 0, 0x88404040);
+            graphics_draw_quad(x, panel_top, panel_width, panel_height, 0, 0, 0, 0, 0x88404040);
+            graphics_draw_quad(x + 4.0f, panel_top + panel_height - 20.0f, panel_width - 8.0f, 14.0f, 0, 0, 0, 0, 0x77303030);
+            graphics_draw_text_center(font_small, "Locked", x + panel_width / 2.0f, panel_top + panel_height - 13.0f, 1.0f, 0xFFCCCCCC);
         }
 
-        y += 10;
+        float y = panel_top + 10.0f;
         graphics_draw_text(font_small, game_util_get_blind_name(i), x + 3, y + 1, 1.0f, COLOR_BLACK);
         graphics_draw_text(font_small, game_util_get_blind_name(i), x + 2, y, 1.0f, COLOR_WHITE);
 
@@ -1766,6 +1844,34 @@ void game_draw_blind_select()
         graphics_draw_text(font_small, str, x + 2, y, 1.0f, style->score_color);
 
         graphics_draw_quad(x + 1.0f, y + 14.0f, panel_width - 2.0f, 1.0f, 0, 0, 0, 0, style->border_color);
+
+        y += 18.0f;
+        graphics_draw_text(font_small, "Reward", x + 2.0f, y, 1.0f, HUD_LABEL_COLOR);
+        graphics_draw_text(font_small, "$$$", x + panel_width - 22.0f, y, 1.0f, COLOR_TEXT_YELLOW);
+
+        if (is_selected)
+        {
+            float action_y = panel_top + panel_height - 58.0f;
+            graphics_draw_quad(x + 3.0f, action_y - 4.0f, panel_width - 6.0f, 54.0f, 0, 0, 0, 0, 0xAA1A1A1A);
+
+            game_draw_action_button(
+                x + 6.0f, action_y,
+                panel_width - 12.0f, 16.0f,
+                "Select", game_util_get_blind_name(i),
+                GAMEPAD_UI_CROSS, false,
+                COLOR_GREEN_BUTTON,
+                is_focused);
+
+            graphics_draw_text_center(font_small, "or", x + panel_width / 2.0f, action_y + 23.0f, 1.0f, HUD_LABEL_COLOR);
+
+            game_draw_action_button(
+                x + 6.0f, action_y + 28.0f,
+                panel_width - 12.0f, 16.0f,
+                "Skip Blind", NULL,
+                GAMEPAD_UI_CIRCLE, false,
+                0xFF5A5A5A,
+                false);
+        }
 
         x += panel_width + LAYOUT_PANEL_GAP;
     }
@@ -2145,10 +2251,21 @@ static void game_draw_background_depth_layers()
 {
     graphics_set_no_texture();
 
-    // Layer 1: broad atmospheric modulation (top cool cast + bottom weight).
-    graphics_draw_quad(0.0f, 0.0f, SCREEN_WIDTH, 44.0f, 0, 0, 0, 0, 0x10253A44);
-    graphics_draw_quad(0.0f, SCREEN_HEIGHT - 62.0f, SCREEN_WIDTH, 62.0f, 0, 0, 0, 0, 0x13000000);
-    graphics_draw_quad(LAYOUT_CENTER_X - 10.0f, 32.0f, LAYOUT_CENTER_WIDTH + 20.0f, SCREEN_HEIGHT - 90.0f, 0, 0, 0, 0, 0x06243F50);
+    bool use_blind_background = (g_game_state.blind == GAME_BLIND_SMALL || g_game_state.blind == GAME_BLIND_LARGE) && tex_blind_background >= 0;
+    if (use_blind_background)
+    {
+        game_draw_static_background_texture(tex_blind_background);
+        graphics_draw_quad(0.0f, 0.0f, SCREEN_WIDTH, 24.0f, 0, 0, 0, 0, 0x08000000);
+        graphics_draw_quad(0.0f, SCREEN_HEIGHT - 24.0f, SCREEN_WIDTH, 24.0f, 0, 0, 0, 0, 0x08000000);
+        graphics_draw_quad(LAYOUT_CENTER_X - 10.0f, 32.0f, LAYOUT_CENTER_WIDTH + 20.0f, SCREEN_HEIGHT - 90.0f, 0, 0, 0, 0, 0x04000000);
+    }
+    else
+    {
+        // Layer 1: broad atmospheric modulation (top cool cast + bottom weight).
+        graphics_draw_quad(0.0f, 0.0f, SCREEN_WIDTH, 44.0f, 0, 0, 0, 0, 0x10253A44);
+        graphics_draw_quad(0.0f, SCREEN_HEIGHT - 62.0f, SCREEN_WIDTH, 62.0f, 0, 0, 0, 0, 0x13000000);
+        graphics_draw_quad(LAYOUT_CENTER_X - 10.0f, 32.0f, LAYOUT_CENTER_WIDTH + 20.0f, SCREEN_HEIGHT - 90.0f, 0, 0, 0, 0, 0x06243F50);
+    }
 
     // Layer 2: soft vignette + sparse scanline texture for depth.
     for (int i = 0; i < 9; i++)

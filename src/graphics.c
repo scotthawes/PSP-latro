@@ -59,6 +59,7 @@ int g_font_count = 0;
 int g_allocated_graphic_bytes = 0;
 
 static inline unsigned char graphics_font_map_char(unsigned char c);
+static inline unsigned char graphics_font_map_char_for_font(int font, unsigned char c);
 
 #ifdef DEBUG
 static int g_font_debug_log_budget = 24;
@@ -1151,18 +1152,35 @@ void graphics_draw_solid_quad(float x, float y, float w, float h, uint32_t color
 
 static inline unsigned char graphics_font_map_char(unsigned char c)
 {
-    // Built-in font atlas stores lowercase glyphs one slot earlier than ASCII.
-    if (c >= 'a' && c <= 'z') return (unsigned char)(c - 1);
+    // Keep direct ASCII mapping; lowercase remap caused systematic garbling.
     return c;
 }
 
-static inline unsigned char graphics_font_map_codepoint(unsigned int cp)
+static inline unsigned char graphics_font_map_char_for_font(int font, unsigned char c)
+{
+    if (font >= 0 && font < MAX_FONTS && g_fonts[font].in_use)
+    {
+        /* Big built-in font atlas stores lowercase glyphs one slot earlier.
+         * Small font uses direct ASCII layout. */
+        if (g_fonts[font].width == FONT_BIG_WIDTH && g_fonts[font].height == FONT_BIG_HEIGHT)
+        {
+            if (c >= 'a' && c <= 'z')
+            {
+                return (unsigned char)(c - 1);
+            }
+        }
+    }
+
+    return graphics_font_map_char(c);
+}
+
+static inline unsigned char graphics_font_map_codepoint(int font, unsigned int cp)
 {
     if (cp > 0xFF)
     {
         cp = (unsigned int)'?';
     }
-    return graphics_font_map_char((unsigned char)cp);
+    return graphics_font_map_char_for_font(font, (unsigned char)cp);
 }
 
 static unsigned int graphics_decode_codepoint_compat(const char *text, int *index)
@@ -1272,7 +1290,7 @@ void graphics_draw_text(int font, const char *text, float x, float y, float size
     while (text[index] != 0)
     {
         unsigned int cp = graphics_decode_codepoint_compat(text, &index);
-        unsigned char mapped = graphics_font_map_codepoint(cp);
+        unsigned char mapped = graphics_font_map_codepoint(font, cp);
         graphics_draw_quad(floorf(x) + (size * g_fonts[font].width) * count, floorf(y),
             (size * g_fonts[font].width), (size * g_fonts[font].height),
             ((int)mapped % g_fonts[font].length_x) * g_fonts[font].width, ((int)mapped / g_fonts[font].length_x) * g_fonts[font].height,
@@ -1373,7 +1391,7 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
                     while (str[token_index] != 0)
                     {
                         unsigned int cp = graphics_decode_codepoint_compat(str, &token_index);
-                        unsigned char mapped = graphics_font_map_codepoint(cp);
+                        unsigned char mapped = graphics_font_map_codepoint(font, cp);
                         if (current_background_color != 0)
                         {
                             graphics_draw_solid_quad(floorf(x) + (size * g_fonts[font].width) * length, floorf(y),
@@ -1404,7 +1422,7 @@ void graphics_draw_text_formatted(int font, const char *text, void *item, float 
                 background_start = false;
             }
             unsigned int cp = graphics_decode_codepoint_compat(text, &count);
-            unsigned char mapped = graphics_font_map_codepoint(cp);
+            unsigned char mapped = graphics_font_map_codepoint(font, cp);
             graphics_draw_quad(floorf(x) + (size * g_fonts[font].width) * length, floorf(y),
                 (size * g_fonts[font].width), (size * g_fonts[font].height),
                 ((int)mapped % g_fonts[font].length_x) * g_fonts[font].width, ((int)mapped / g_fonts[font].length_x) * g_fonts[font].height,
