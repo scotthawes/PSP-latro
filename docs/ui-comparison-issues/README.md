@@ -11,6 +11,10 @@ This folder tracks the next wave of UI differences after the previous parity set
 - ISSUE-05-gameplay-table-depth-composition-gap.md
 - ISSUE-06-title-main-menu-parity-gap.md
 - ISSUE-07-modal-screens-parity-gap.md
+- ISSUE-08-title-main-menu-layout-parity-gap.md
+- ISSUE-09-settings-and-tabbed-dialog-structure-gap.md
+- ISSUE-10-language-and-credits-panel-parity-gap.md
+- ISSUE-11-run-setup-and-game-over-modal-parity-gap.md
 
 See also:
 
