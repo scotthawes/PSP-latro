@@ -57,6 +57,7 @@ struct Settings
     bool audio;
     bool move_cards;
     bool overclock;
+    bool debug_overlay;
     int ante_score_scaling;
     int speed;
     int wallpaper_variant;

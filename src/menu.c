@@ -59,6 +59,7 @@ static int s_language_icon_texture = -1;
 static int s_social_discord_icon_texture = -1;
 static int s_social_x_icon_texture = -1;
 static int s_action_button_textures[MENU_MAIN_ITEM_COUNT] = { -1, -1, -1, -1 };
+static int s_missing_ui_asset_count = 0;
 
 #define MENU_WALLPAPER_VARIANT_COUNT 2
 static int s_title_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
@@ -116,16 +117,25 @@ struct MenuButtonStyle
 
 // Wallpaper loading removed per user constraint: do not use wallpapers/ directory
 
-static int menu_load_ui_texture(const char *path)
+static int menu_load_ui_texture(const char *asset_key, const char *path, bool required)
 {
     int texture = graphics_load_wallpaper(path);
     if (texture >= 0)
     {
+        DEBUG_PRINTF("[MENU][ASSET] key=%s path=%s texture=%d\n", asset_key, path, texture);
         return texture;
     }
 
     // Keep menu startup deterministic: archive lookups in first-frame menu init can stall.
-    DEBUG_PRINTF("[MENU] failed to load UI texture: %s\n", path);
+    if (required)
+    {
+        DEBUG_PRINTF("[MENU][MISSING] scene=menu_init key=%s path=%s\n", asset_key, path);
+        s_missing_ui_asset_count++;
+    }
+    else
+    {
+        DEBUG_PRINTF("[MENU][ASSET][SKIP] scene=menu_init key=%s path=%s reason=optional_or_budget\n", asset_key, path);
+    }
     return -1;
 }
 
@@ -141,10 +151,10 @@ static void menu_load_logo_variant(int variant)
         return;
     }
 
-    s_title_logo_textures[variant] = menu_load_ui_texture(s_menu_variant_assets[variant].title_logo);
+    s_title_logo_textures[variant] = menu_load_ui_texture("title_logo_primary", s_menu_variant_assets[variant].title_logo, true);
     if (s_title_logo_textures[variant] < 0)
     {
-        s_title_logo_textures[variant] = menu_load_ui_texture(MENU_TITLE_LOGO_FALLBACK_PATH);
+        s_title_logo_textures[variant] = menu_load_ui_texture("title_logo_fallback", MENU_TITLE_LOGO_FALLBACK_PATH, true);
     }
 
     DEBUG_PRINTF("[MENU] logo variant %d texture=%d\n", variant, s_title_logo_textures[variant]);
@@ -368,6 +378,8 @@ static void menu_init_wallpapers()
         return;
     }
 
+    s_missing_ui_asset_count = 0;
+
     for (int i = 0; i < MENU_WALLPAPER_VARIANT_COUNT; i++)
     {
         s_title_wallpaper_textures[i] = -1;
@@ -377,7 +389,7 @@ static void menu_init_wallpapers()
 
     s_wallpaper_variant = CLAMP(g_settings.wallpaper_variant, 0, MENU_WALLPAPER_VARIANT_COUNT - 1);
 
-    s_title_wallpaper_textures[0] = menu_load_ui_texture(MENU_TITLE_BACKGROUND_PATH);
+    s_title_wallpaper_textures[0] = menu_load_ui_texture("title_background", MENU_TITLE_BACKGROUND_PATH, true);
     if (s_title_wallpaper_textures[0] < 0)
     {
         DEBUG_PRINTF("[MENU] failed to load title background: %s\n", MENU_TITLE_BACKGROUND_PATH);
@@ -394,15 +406,38 @@ static void menu_init_wallpapers()
     menu_apply_active_variant_assets();
 
     // Optional UI chrome loads after core title assets.
-    s_profile_icon_texture = menu_load_ui_texture(MENU_PROFILE_ICON_PATH);
-    s_language_icon_texture = menu_load_ui_texture(MENU_LANGUAGE_ICON_PATH);
-    s_social_discord_icon_texture = menu_load_ui_texture(MENU_SOCIAL_DISCORD_ICON_PATH);
-    s_social_x_icon_texture = menu_load_ui_texture(MENU_SOCIAL_X_ICON_PATH);
+    s_profile_icon_texture = menu_load_ui_texture("profile_icon", MENU_PROFILE_ICON_PATH, true);
+    s_language_icon_texture = menu_load_ui_texture("language_icon", MENU_LANGUAGE_ICON_PATH, true);
+    s_social_discord_icon_texture = menu_load_ui_texture("social_discord_icon", MENU_SOCIAL_DISCORD_ICON_PATH, true);
+    s_social_x_icon_texture = menu_load_ui_texture("social_x_icon", MENU_SOCIAL_X_ICON_PATH, true);
 
-    s_action_button_textures[MENU_MAIN_ITEM_NEW_RUN] = menu_load_ui_texture(MENU_ACTION_BUTTON_PLAY_PATH);
-    s_action_button_textures[MENU_MAIN_ITEM_OPTIONS] = menu_load_ui_texture(MENU_ACTION_BUTTON_OPTIONS_PATH);
-    s_action_button_textures[MENU_MAIN_ITEM_QUIT] = menu_load_ui_texture(MENU_ACTION_BUTTON_QUIT_PATH);
-    s_action_button_textures[MENU_MAIN_ITEM_COLLECTION] = menu_load_ui_texture(MENU_ACTION_BUTTON_COLLECTION_PATH);
+    s_action_button_textures[MENU_MAIN_ITEM_NEW_RUN] = menu_load_ui_texture("action_button_play", MENU_ACTION_BUTTON_PLAY_PATH, true);
+    s_action_button_textures[MENU_MAIN_ITEM_OPTIONS] = menu_load_ui_texture("action_button_options", MENU_ACTION_BUTTON_OPTIONS_PATH, true);
+    s_action_button_textures[MENU_MAIN_ITEM_QUIT] = menu_load_ui_texture("action_button_quit", MENU_ACTION_BUTTON_QUIT_PATH, true);
+    s_action_button_textures[MENU_MAIN_ITEM_COLLECTION] = menu_load_ui_texture("action_button_collection", MENU_ACTION_BUTTON_COLLECTION_PATH, false);
+    if (s_action_button_textures[MENU_MAIN_ITEM_COLLECTION] < 0)
+    {
+        int fallback_texture = s_action_button_textures[MENU_MAIN_ITEM_QUIT];
+        if (fallback_texture < 0)
+        {
+            fallback_texture = s_action_button_textures[MENU_MAIN_ITEM_OPTIONS];
+        }
+        if (fallback_texture < 0)
+        {
+            fallback_texture = s_action_button_textures[MENU_MAIN_ITEM_NEW_RUN];
+        }
+
+        if (fallback_texture >= 0)
+        {
+            s_action_button_textures[MENU_MAIN_ITEM_COLLECTION] = fallback_texture;
+            DEBUG_PRINTF("[MENU][ASSET][FALLBACK] key=action_button_collection reused_texture=%d\n", fallback_texture);
+        }
+    }
+
+    if (s_missing_ui_asset_count > 0)
+    {
+        DEBUG_PRINTF("[MENU][MISSING] unresolved_ui_assets=%d\n", s_missing_ui_asset_count);
+    }
 
     s_wallpapers_initialized = true;
 }
@@ -483,7 +518,7 @@ static void menu_draw_title()
     {
         struct MenuButtonStyle style = menu_get_button_style(i, i == g_game_state.menu_selected_item);
 
-        menu_draw_button_widget(button_x, button_y, button_w, button_h, -1, &style);
+        menu_draw_button_widget(button_x, button_y, button_w, button_h, s_action_button_textures[i], &style);
         menu_draw_button_label_centered(s_main_menu_labels[i], button_x, button_y, button_w, button_h, font_small, 1.12f, &style);
         menu_validate_rect("action_button", button_x, button_y, button_w, button_h);
 

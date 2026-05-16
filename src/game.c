@@ -13,6 +13,7 @@ struct Settings g_settings = {
     false,
     true,
     false,
+    false,
     2,
     1,
     0
@@ -849,13 +850,49 @@ void game_discard_card(int i)
     g_game_state.hand.card_count--;
 }
 
+static void game_get_hand_card_layout(int index, int count, bool selected, float *x, float *y, float *angle)
+{
+    float hand_y = game_get_hand_y();
+    if (count <= 1)
+    {
+        *x = DRAW_HAND_X + (DRAW_HAND_WIDTH - CARD_WIDTH) / 2.0f;
+        *y = hand_y - (selected ? 7.0f : 0.0f);
+        *angle = 0.0f;
+        return;
+    }
+
+    float center = ((float)count - 1.0f) / 2.0f;
+    float from_center = (float)index - center;
+    float normalized = from_center / center;
+    float abs_normalized = fabsf(normalized);
+
+    float density = ((float)count - 1.0f) / 7.0f;
+    if (density < 0.0f) density = 0.0f;
+    if (density > 1.0f) density = 1.0f;
+
+    // Keep 8-card hands compact, but open up 5-card layouts for readability.
+    float spacing = 62.0f - density * 24.0f;
+    float hand_center_x = DRAW_HAND_X + (DRAW_HAND_WIDTH - CARD_WIDTH) / 2.0f;
+
+    *x = hand_center_x + from_center * spacing;
+    // Slight upward edge arc keeps cards off bottom action controls.
+    *y = hand_y - (abs_normalized * abs_normalized) * 3.0f - (selected ? 5.0f : 0.0f);
+
+    // Smooth, symmetric fan tilt around the center card (radians for sceGumRotateZ).
+    float max_angle = 0.03f + density * 0.03f;
+    *angle = normalized * max_angle;
+}
+
 void game_set_card_hand_positions()
 {
     // set cards positions in hand
     for(int i = 0; i < g_game_state.hand.card_count; i++)
     {
-        g_game_state.hand.cards[i]->draw.initial_x = g_game_state.hand.cards[i]->draw.final_x = g_game_state.hand.cards[i]->draw.x = DRAW_HAND_X - (CARD_WIDTH / 2.0f) + (i + 1) * DRAW_HAND_WIDTH / ((float)g_game_state.hand.card_count + 1.0f);
-        g_game_state.hand.cards[i]->draw.initial_y = g_game_state.hand.cards[i]->draw.final_y = g_game_state.hand.cards[i]->draw.y = g_game_state.hand.cards[i]->selected ? game_get_hand_y() - 10.0f : game_get_hand_y();
+        struct DrawObject *draw = &g_game_state.hand.cards[i]->draw;
+        game_get_hand_card_layout(i, g_game_state.hand.card_count, g_game_state.hand.cards[i]->selected,
+            &draw->x, &draw->y, &draw->angle);
+        draw->initial_x = draw->final_x = draw->x;
+        draw->initial_y = draw->final_y = draw->y;
     }
 }
 
@@ -900,8 +937,9 @@ void game_set_card_hand_final_positions()
     // set cards positions in hand
     for(int i = 0; i < g_game_state.hand.card_count; i++)
     {
-        g_game_state.hand.cards[i]->draw.final_x = DRAW_HAND_X - (CARD_WIDTH / 2.0f) + (i + 1) * DRAW_HAND_WIDTH / ((float)g_game_state.hand.card_count + 1.0f);
-        g_game_state.hand.cards[i]->draw.final_y = g_game_state.hand.cards[i]->selected ? game_get_hand_y() - 10.0f : game_get_hand_y();
+        struct DrawObject *draw = &g_game_state.hand.cards[i]->draw;
+        game_get_hand_card_layout(i, g_game_state.hand.card_count, g_game_state.hand.cards[i]->selected,
+            &draw->final_x, &draw->final_y, &draw->angle);
     }
 }
 
@@ -1161,22 +1199,43 @@ void game_set_initial_final_shop_item_position()
     {
         if (g_game_state.shop.items[i].available)
         {
+            struct DrawObject *draw = NULL;
             switch (g_game_state.shop.items[i].type)
             {
                 case ITEM_TYPE_JOKER:
                 {
-                    g_game_state.shop.items[i].info.joker.draw.initial_x = g_game_state.shop.items[i].info.joker.draw.x;
-                    g_game_state.shop.items[i].info.joker.draw.final_x = game_util_get_item_position(i, g_game_state.shop.item_count, DRAW_SHOP_SINGLE_X, DRAW_SHOP_SINGLE_WIDTH, CARD_WIDTH); // DRAW_SHOP_SINGLE_X - (CARD_WIDTH / 2.0f) + (i + 1) * DRAW_SHOP_SINGLE_WIDTH / ((float)g_game_state.shop.item_count + 1.0f);
-                    g_game_state.shop.items[i].info.joker.draw.final_y = DRAW_SHOP_SINGLE_Y;
-                    g_game_state.shop.items[i].info.joker.draw.initial_y = g_game_state.shop.items[i].info.joker.draw.y;
-                    g_game_state.shop.items[i].info.joker.draw.angle = 0.0f;
-                    g_game_state.shop.items[i].info.joker.draw.scale = 1.0f;
-                    g_game_state.shop.items[i].info.joker.draw.white_factor = 0.0f;
-                    g_game_state.shop.items[i].info.joker.draw.alpha = 1.0f;
-                }
+                    draw = &g_game_state.shop.items[i].info.joker.draw;
                     break;
+                }
+                case ITEM_TYPE_PLANET:
+                {
+                    draw = &g_game_state.shop.items[i].info.planet.draw;
+                    break;
+                }
+                case ITEM_TYPE_TAROT:
+                {
+                    draw = &g_game_state.shop.items[i].info.tarot.draw;
+                    break;
+                }
+                case ITEM_TYPE_CARD:
+                {
+                    draw = &g_game_state.shop.items[i].info.card.draw;
+                    break;
+                }
                 default:
                     break;
+            }
+
+            if (draw != NULL)
+            {
+                draw->initial_x = draw->x;
+                draw->final_x = game_util_get_item_position(i, g_game_state.shop.item_count, DRAW_SHOP_SINGLE_X, DRAW_SHOP_SINGLE_WIDTH, CARD_WIDTH);
+                draw->final_y = DRAW_SHOP_SINGLE_Y;
+                draw->initial_y = draw->y;
+                draw->angle = 0.0f;
+                draw->scale = 1.0f;
+                draw->white_factor = 0.0f;
+                draw->alpha = 1.0f;
             }
         }
     }
@@ -1636,6 +1695,12 @@ bool game_init_load_file_values()
                 if (token_type != INI_TOKEN_VALUE) return false;
                 g_settings.overclock = (!strcmp(buffer, "true") || !strcmp(buffer, "1"));   
             }
+            else if (!strcmp(buffer, "debug_overlay"))
+            {
+                token_type = ini_read_token(buffer, 128);
+                if (token_type != INI_TOKEN_VALUE) return false;
+                g_settings.debug_overlay = (!strcmp(buffer, "true") || !strcmp(buffer, "1"));
+            }
             else if (!strcmp(buffer, "ante_score_scaling"))
             {
                 token_type = ini_read_token(buffer, 128);
@@ -1697,6 +1762,7 @@ bool game_save_file_values()
     fprintf(f, "audio = %s\n", g_settings.audio ? "true" : "false");
     fprintf(f, "move_cards = %s\n", g_settings.move_cards ? "true" : "false");
     fprintf(f, "overclock = %s\n", g_settings.overclock ? "true" : "false");
+    fprintf(f, "debug_overlay = %s\n", g_settings.debug_overlay ? "true" : "false");
     fprintf(f, "speed = %d\n", g_settings.speed);
     fprintf(f, "ante_score_scaling = %d\n", g_settings.ante_score_scaling);
     fprintf(f, "wallpaper_variant = %d\n", g_settings.wallpaper_variant);
