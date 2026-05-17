@@ -1056,6 +1056,16 @@ static void analog_inject(unsigned int button, bool deflected, int *timer)
 
 void game_input_update(bool no_input)
 {
+    if (g_game_state.input_focused_zone == INPUT_FOCUSED_ZONE_MENU_TITLE)
+    {
+        static int input_log_counter = 0;
+        if ((input_log_counter++ % 60) == 0) {
+            char logbuf[128];
+            snprintf(logbuf, sizeof(logbuf), "input: menu_title focused buttons=0x%08X last=0x%08X", 
+                     g_pad.Buttons, g_last_pad.Buttons);
+            boot_log(logbuf);
+        }
+    }
     if (!no_input)
     {
         analog_inject(PSP_CTRL_LEFT,  g_pad.Lx < 128 - ANALOG_DEADZONE, &s_al);

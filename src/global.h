@@ -41,6 +41,8 @@
 #define BUFFER_WIDTH    512
 #define BUFFER_HEIGHT   272
 
+void boot_log(const char *message);
+
 extern uint32_t g_game_counter;
 
 struct Settings
@@ -946,44 +948,130 @@ void game_input_update(bool no_input);
 
 // DRAW
 
-#define CARD_WIDTH  48
-#define CARD_HEIGHT 65
+// Layout helpers
+#define UI_MARGIN_X                (SCREEN_WIDTH * 0.01f)
+#define UI_MARGIN_Y                (SCREEN_HEIGHT * 0.01f)
+#define UI_PADDING_SM              2.0f
 
-#define BOOSTER_WIDTH  55
-#define BOOSTER_HEIGHT 80
+// Top-level ingame containers
+#define UI_SCORE_PANEL_X           2.0f
+#define UI_SCORE_PANEL_Y           2.0f
+#define UI_SCORE_PANEL_WIDTH       (SCREEN_WIDTH * 0.20f)
+#define UI_SCORE_PANEL_HEIGHT      (SCREEN_HEIGHT - 4.0f)
 
-#define DRAW_HAND_Y             170.0f
-#define DRAW_HAND_Y_IN_SCORE    194.0f
-#define DRAW_HAND_Y_IN_BOOSTER  100.0f
-#define DRAW_HAND_X             100.0f
-#define DRAW_HAND_WIDTH         350.0f
-#define DRAW_SELECTED_CARD_Y    140.0f
-#define DRAW_PLAYED_CARDS_Y     120.0f
-#define DRAW_SCORING_CARDS_Y    110.0f
-#define DRAW_JOKERS_X           100.0f
-#define DRAW_JOKERS_WIDTH       250.0f
-#define DRAW_JOKERS_Y           10.0f
-#define DRAW_CONSUMABLES_X      360.0f
-#define DRAW_CONSUMABLES_WIDTH  110.0f
-#define DRAW_CONSUMABLES_y      10.0f
-#define DRAW_DECK_X             420.0f
-#define DRAW_DECK_Y             190.0f
-#define DRAW_SHOP_SINGLE_X      198.0f
-#define DRAW_SHOP_SINGLE_WIDTH  200.0f
-#define DRAW_SHOP_SINGLE_Y      100.0f
-#define DRAW_SHOP_BOOSTER_X      228.0f
-#define DRAW_SHOP_BOOSTER_WIDTH  170.0f
-#define DRAW_SHOP_BOOSTER_Y      182.0f
-#define DRAW_BOOSTER_ITEMS_X    100.0f
-#define DRAW_BOOSTER_ITEMS_Y    180.0f
-#define DRAW_BOOSTER_ITEMS_WIDTH 350.0f
-#define DRAW_DECK_INFO_WIDTH    400.0f
-#define DRAW_DECK_INFO_HEIGHT   250.0f
-#define DRAW_RUN_INFO_WIDTH     312.0f
-#define DRAW_RUN_INFO_HEIGHT    250.0f
+// Sidebar HUD Sub-containers (Ratios of UI_SCORE_PANEL_HEIGHT)
+#define HUD_ROW_HEADER_H           0.19f
+#define HUD_ROW_ROUND_SCORE_H      0.11f
+#define HUD_ROW_HAND_INFO_H        0.13f
+#define HUD_ROW_CHIPS_MULT_H       0.08f
+#define HUD_ROW_STATS_H            0.12f
+#define HUD_ROW_WEALTH_H           0.07f
+#define HUD_ROW_FOOTER_H           0.12f
 
-#define CARD_HINT_WIDTH             146.0f
-#define CARD_HINT_MIN_HEIGHT        30.0f
+#define UI_PLAYFIELD_X             (UI_SCORE_PANEL_X + UI_SCORE_PANEL_WIDTH + (SCREEN_WIDTH * 0.01f))
+#define UI_PLAYFIELD_Y             2.0f
+#define UI_PLAYFIELD_WIDTH         (SCREEN_WIDTH - UI_PLAYFIELD_X - (SCREEN_WIDTH * 0.01f))
+#define UI_PLAYFIELD_HEIGHT        (SCREEN_HEIGHT - 4.0f)
+
+// Subcontainers: Jokers/Consumables (shared top row)
+#define UI_TOPROW_X                UI_PLAYFIELD_X
+#define UI_TOPROW_Y                (SCREEN_HEIGHT * 0.037f)
+#define UI_TOPROW_WIDTH            UI_PLAYFIELD_WIDTH
+#define UI_TOPROW_HEIGHT           (SCREEN_HEIGHT * 0.20f)
+#define UI_TOPROW_GAP              (UI_TOPROW_WIDTH * 0.02f)
+
+#define UI_JOKERS_CONTAINER_X      UI_TOPROW_X
+#define UI_JOKERS_CONTAINER_Y      UI_TOPROW_Y
+#define UI_JOKERS_CONTAINER_WIDTH  (UI_TOPROW_WIDTH * 0.66f)
+#define UI_JOKERS_CONTAINER_HEIGHT UI_TOPROW_HEIGHT
+
+#define UI_CONSUMABLES_CONTAINER_X (UI_JOKERS_CONTAINER_X + UI_JOKERS_CONTAINER_WIDTH + UI_TOPROW_GAP)
+#define UI_CONSUMABLES_CONTAINER_Y UI_TOPROW_Y
+#define UI_CONSUMABLES_CONTAINER_WIDTH ((UI_TOPROW_X + UI_TOPROW_WIDTH) - UI_CONSUMABLES_CONTAINER_X)
+#define UI_CONSUMABLES_CONTAINER_HEIGHT UI_TOPROW_HEIGHT
+
+// Subcontainers: Hand and actions
+#define UI_HAND_CONTAINER_WIDTH    (UI_PLAYFIELD_WIDTH * 0.68f)
+#define UI_HAND_CONTAINER_HEIGHT   (SCREEN_HEIGHT * 0.20f)
+#define UI_HAND_CONTAINER_X        (UI_PLAYFIELD_X + (UI_PLAYFIELD_WIDTH - UI_HAND_CONTAINER_WIDTH) * 0.5f)
+#define UI_HAND_CONTAINER_Y        (SCREEN_HEIGHT * 0.63f)
+
+#define UI_HAND_ACTIONS_CONTAINER_X      UI_HAND_CONTAINER_X
+#define UI_HAND_ACTIONS_CONTAINER_Y      (UI_HAND_CONTAINER_Y + UI_HAND_CONTAINER_HEIGHT + (SCREEN_HEIGHT * 0.012f))
+#define UI_HAND_ACTIONS_CONTAINER_WIDTH  UI_HAND_CONTAINER_WIDTH
+#define UI_HAND_ACTIONS_CONTAINER_HEIGHT (SCREEN_HEIGHT * 0.10f)
+
+// Subcontainer: Deck
+#define UI_DECK_CONTAINER_WIDTH    (UI_PLAYFIELD_WIDTH * 0.18f)
+#define UI_DECK_CONTAINER_HEIGHT   (SCREEN_HEIGHT * 0.28f)
+#define UI_DECK_CONTAINER_X        (UI_PLAYFIELD_X + UI_PLAYFIELD_WIDTH - UI_DECK_CONTAINER_WIDTH)
+#define UI_DECK_CONTAINER_Y        (SCREEN_HEIGHT * 0.68f)
+
+// Card/booster sizing derived from hand container (prevents overlap drift)
+#define UI_LAYOUT_MAX_HAND_CARDS   8.0f
+#define CARD_WIDTH                 (UI_HAND_CONTAINER_WIDTH / (UI_LAYOUT_MAX_HAND_CARDS + 0.4f))
+#define CARD_HEIGHT                (CARD_WIDTH * 1.35f)
+
+#define BOOSTER_WIDTH              (CARD_WIDTH * 1.35f)
+#define BOOSTER_HEIGHT             (CARD_HEIGHT * 1.45f)
+
+// Legacy aliases mapped to container system
+#define DRAW_LEFT_INFO_WIDTH       UI_SCORE_PANEL_WIDTH
+
+#define DRAW_HAND_WIDTH            UI_HAND_CONTAINER_WIDTH
+#define DRAW_HAND_X                UI_HAND_CONTAINER_X
+#define DRAW_HAND_Y                UI_HAND_CONTAINER_Y
+#define DRAW_HAND_Y_IN_SCORE       (SCREEN_HEIGHT * 0.71f)
+#define DRAW_HAND_Y_IN_BOOSTER     (SCREEN_HEIGHT * 0.37f)
+#define DRAW_SELECTED_CARD_Y       (SCREEN_HEIGHT * 0.52f)
+#define DRAW_PLAYED_CARDS_Y        (SCREEN_HEIGHT * 0.44f)
+#define DRAW_SCORING_CARDS_Y       (SCREEN_HEIGHT * 0.40f)
+
+#define DRAW_JOKERS_X              UI_JOKERS_CONTAINER_X
+#define DRAW_JOKERS_WIDTH          UI_JOKERS_CONTAINER_WIDTH
+#define DRAW_JOKERS_Y              UI_JOKERS_CONTAINER_Y
+
+#define DRAW_CONSUMABLES_X         UI_CONSUMABLES_CONTAINER_X
+#define DRAW_CONSUMABLES_WIDTH     UI_CONSUMABLES_CONTAINER_WIDTH
+#define DRAW_CONSUMABLES_Y         UI_CONSUMABLES_CONTAINER_Y
+
+#define DRAW_DECK_X                UI_DECK_CONTAINER_X
+#define DRAW_DECK_Y                UI_DECK_CONTAINER_Y
+
+#define LAYOUT_CENTER_X            UI_PLAYFIELD_X
+#define LAYOUT_CENTER_WIDTH        (UI_PLAYFIELD_WIDTH * 0.72f)
+#define LAYOUT_RIGHT_RAIL_X        (UI_PLAYFIELD_X + UI_PLAYFIELD_WIDTH - (SCREEN_WIDTH * 0.15f))
+#define LAYOUT_MID_CLUSTER_Y       (SCREEN_HEIGHT * 0.33f)
+#define LAYOUT_PANEL_GAP           (SCREEN_WIDTH * 0.016f)
+
+// Shop Layout
+#define UI_SHOP_PADDING            4.0f
+#define UI_SHOP_CONTROLS_WIDTH     (SCREEN_WIDTH * 0.15f)
+
+#define DRAW_SHOP_COL1_X        (LAYOUT_CENTER_X + 6.0f)
+#define DRAW_SHOP_COL1_W        (UI_SHOP_CONTROLS_WIDTH - 8.0f)
+#define DRAW_SHOP_COL2_X        (DRAW_SHOP_COL1_X + DRAW_SHOP_COL1_W + 6.0f)
+#define DRAW_SHOP_COL2_W        (LAYOUT_CENTER_X + LAYOUT_CENTER_WIDTH - DRAW_SHOP_COL2_X - 10.0f)
+
+#define DRAW_SHOP_SINGLE_X      DRAW_SHOP_COL2_X
+#define DRAW_SHOP_SINGLE_WIDTH  DRAW_SHOP_COL2_W
+#define DRAW_SHOP_SINGLE_Y      (LAYOUT_MID_CLUSTER_Y + 31.0f)
+#define DRAW_SHOP_BOOSTER_X     DRAW_SHOP_COL2_X
+#define DRAW_SHOP_BOOSTER_WIDTH DRAW_SHOP_COL2_W
+#define DRAW_SHOP_BOOSTER_Y     (LAYOUT_MID_CLUSTER_Y + 107.0f)
+#define DRAW_SHOP_VOUCHER_X     DRAW_SHOP_COL1_X
+#define DRAW_SHOP_VOUCHER_WIDTH DRAW_SHOP_COL1_W
+#define DRAW_SHOP_VOUCHER_Y     (LAYOUT_MID_CLUSTER_Y + 117.0f)
+#define DRAW_BOOSTER_ITEMS_X    (SCREEN_WIDTH * 0.23f)
+#define DRAW_BOOSTER_ITEMS_Y    (SCREEN_HEIGHT * 0.66f)
+#define DRAW_BOOSTER_ITEMS_WIDTH (SCREEN_WIDTH * 0.73f)
+#define DRAW_DECK_INFO_WIDTH    (SCREEN_WIDTH * 0.83f)
+#define DRAW_DECK_INFO_HEIGHT   (SCREEN_HEIGHT * 0.92f)
+#define DRAW_RUN_INFO_WIDTH     (SCREEN_WIDTH * 0.65f)
+#define DRAW_RUN_INFO_HEIGHT    (SCREEN_HEIGHT * 0.92f)
+
+#define CARD_HINT_WIDTH             (SCREEN_WIDTH * 0.21f)
+#define CARD_HINT_MIN_HEIGHT        (SCREEN_HEIGHT * 0.11f)
 
 float lerp(float min, float max, float t);
 
@@ -1110,7 +1198,10 @@ void graphics_draw_quad(float x, float y, float w, float h, int16_t u, int16_t v
 void graphics_draw_solid_quad(float x, float y, float w, float h, uint32_t color);
 void graphics_draw_text_center(int font, const char *text, float x, float y, float size, uint32_t color);
 void graphics_draw_text(int font, const char *text, float x, float y, float size, uint32_t color);
+float graphics_get_text_scale_to_fit(int font, const char* text, float target_width, float max_scale);
+int graphics_count_text_columns_compat(const char *text);
 void graphics_draw_text_formatted_center(int font, const char *text, void *item, float x, float y, float size, uint32_t color);
+float graphics_get_text_formatted_scale_to_fit(int font, const char* text, void* item, float target_width, float max_scale);
 void graphics_draw_text_formatted(int font, const char *text, void *item, float x, float y, float size, uint32_t color);
 void graphics_clear_loading_text(uint32_t clear_color);
 void graphics_show_loading_text(int font_tex, const char *text, float x, float y, float size, uint32_t text_color, bool clear, uint32_t clear_color);
@@ -1173,4 +1264,3 @@ void menu_input_options(bool no_input);
 
 // game.c forward declaration used in menu.c
 void game_begin_new_run();
-

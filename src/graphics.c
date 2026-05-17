@@ -47,7 +47,7 @@ struct Font
     int length_x, length_y;
 };
 
-#define MAX_TEXTURES    32
+#define MAX_TEXTURES    64
 #define MAX_FONTS       5
 
 struct Texture g_textures[MAX_TEXTURES];
@@ -638,6 +638,7 @@ struct Image graphics_load_image(const char *filename)
 
     for (int i = 0; i < attempt_count; i++)
     {
+        DEBUG_PRINTF("[LOAD] Trying path[%d]: %s\n", i, attempts[i]);
         if (graphics_try_load_image_from_path(attempts[i], &image))
         {
             g_allocated_graphic_bytes += image.w * image.h * image.channels;
@@ -686,33 +687,23 @@ int graphics_load_texture_from_image(struct Image *loaded_image, int start_x, in
                      source_width, source_height, desired_width, desired_height);
     }
 
-    int real_height = (loaded_image->h - start_y) < desired_height ? (loaded_image->h - start_y) : desired_height;
-
-    image = (uint8_t *) malloc(desired_width*desired_height*4);
-
-    uint32_t *src = (uint32_t *)(loaded_image->data);
+    // Parity fix: Disable sampling-based scaling for standard textures.
+    // For atlases like BlindChips, we prefer 1:1 pixel mapping (cropping) 
+    // over squashing, which preserves clarity for the first 512 pixels.
+    image = (uint8_t *) malloc(desired_width * desired_height * 4);
     uint32_t *dst = (uint32_t *)image;
 
-    src += start_y * loaded_image->w;
-    for (int j = 0; j < real_height; j++)
+    for (int j = 0; j < desired_height; j++)
     {
-        src += start_x;
         for (int i = 0; i < desired_width; i++)
         {
-            if (i < (loaded_image->w - start_x))
-            {
-                *dst = *src;
-                src++;
-            }
-            else
-            {
+            if (i < source_width && j < source_height) {
+                uint32_t *pixel = (uint32_t *)loaded_image->data + (start_y + j) * loaded_image->w + (start_x + i);
+                *dst = *pixel;
+            } else {
                 *dst = 0x00000000;
             }
             dst++;
-        }
-        if (desired_width < (loaded_image->w - start_x))
-        {
-            src += loaded_image->w - desired_width;
         }
     }
 
@@ -789,33 +780,21 @@ int graphics_load_texture_from_image_16bit(struct Image *loaded_image, int start
                      source_width, source_height, desired_width, desired_height);
     }
 
-    int real_height = (loaded_image->h - start_y) < desired_height ? (loaded_image->h - start_y) : desired_height;
-
-    image = (uint8_t *) malloc(desired_width*desired_height*2);
-
-    uint32_t *src = (uint32_t *)(loaded_image->data);
+    // Use 1:1 mapping for 16-bit textures to maintain pixel art sharpness.
+    image = (uint8_t *) malloc(desired_width * desired_height * 2);
     uint16_t *dst = (uint16_t *)image;
 
-    src += start_y * loaded_image->w;
-    for (int j = 0; j < real_height; j++)
+    for (int j = 0; j < desired_height; j++)
     {
-        src += start_x;
         for (int i = 0; i < desired_width; i++)
         {
-            if (i < (loaded_image->w - start_x))
-            {
-                *dst = convert_8888_to_4444(*src);
-                src++;
-            }
-            else
-            {
+            if (i < source_width && j < source_height) {
+                uint32_t *pixel = (uint32_t *)loaded_image->data + (start_y + j) * loaded_image->w + (start_x + i);
+                *dst = convert_8888_to_4444(*pixel);
+            } else {
                 *dst = 0x0000;
             }
             dst++;
-        }
-        if (desired_width < (loaded_image->w - start_x))
-        {
-            src += loaded_image->w - desired_width;
         }
     }
 
@@ -1064,13 +1043,25 @@ void graphics_draw_rotated_quad(float x, float y, float w, float h, int16_t u, i
 
     if (g_current_set_texture != -1)
     {
-        int tex_width = g_textures[g_current_set_texture].width;
-        int tex_height = g_textures[g_current_set_texture].height;
-
-        u = u * INT16_MAX / tex_width;
-        v = v * INT16_MAX / tex_height;
-        uw = uw * INT16_MAX / tex_width;
-        vh = vh * INT16_MAX / tex_height;
+        float su, sv;
+        if (g_current_set_texture == -2)
+        {
+            su = 32767.0f / (float)BUFFER_WIDTH;
+            sv = 32767.0f / (float)BUFFER_HEIGHT;
+        }
+        else
+        {
+            struct Texture *tex = &g_textures[g_current_set_texture];
+            // Fixed-point UV coordinates (0..32767) must always span the full power-of-two buffer dimensions.
+            su = 32767.0f / (float)tex->width;
+            sv = 32767.0f / (float)tex->height;
+        }
+        int16_t u1 = (int16_t)((float)(u + uw) * su);
+        int16_t v1 = (int16_t)((float)(v + vh) * sv);
+        u = (int16_t)((float)u * su);
+        v = (int16_t)((float)v * sv);
+        uw = u1 - u;
+        vh = v1 - v;
     }
 
     float w2 = w / 2.0f;
@@ -1116,18 +1107,25 @@ void graphics_draw_quad(float x, float y, float w, float h, int16_t u, int16_t v
 
     if (g_current_set_texture != -1)
     {
-        int tex_width = BUFFER_WIDTH;
-        int tex_height = BUFFER_HEIGHT;
-        if (g_current_set_texture != -2)
+        float su, sv;
+        if (g_current_set_texture == -2)
         {
-            tex_width = g_textures[g_current_set_texture].width;
-            tex_height = g_textures[g_current_set_texture].height;
+            su = 32767.0f / (float)BUFFER_WIDTH;
+            sv = 32767.0f / (float)BUFFER_HEIGHT;
         }
-
-        u = u * INT16_MAX / tex_width;
-        v = v * INT16_MAX / tex_height;
-        uw = uw * INT16_MAX / tex_width;
-        vh = vh * INT16_MAX / tex_height;
+        else
+        {
+            struct Texture *tex = &g_textures[g_current_set_texture];
+            // Fixed-point UV coordinates (0..32767) must always span the full power-of-two buffer dimensions.
+            su = 32767.0f / (float)tex->width;
+            sv = 32767.0f / (float)tex->height;
+        }
+        int16_t u1 = (int16_t)((float)(u + uw) * su);
+        int16_t v1 = (int16_t)((float)(v + vh) * sv);
+        u = (int16_t)((float)u * su);
+        v = (int16_t)((float)v * sv);
+        uw = u1 - u;
+        vh = v1 - v;
     }
 
     g_quad_vertices[index+0].x = x;     g_quad_vertices[index+0].y = y;      g_quad_vertices[index+0].z = 0;
@@ -1250,7 +1248,7 @@ static unsigned int graphics_decode_codepoint_compat(const char *text, int *inde
     return (unsigned int)c0;
 }
 
-static int graphics_count_text_columns_compat(const char *text)
+int graphics_count_text_columns_compat(const char *text)
 {
     if (text == NULL)
     {
@@ -1265,6 +1263,16 @@ static int graphics_count_text_columns_compat(const char *text)
         length++;
     }
     return length;
+}
+
+float graphics_get_text_scale_to_fit(int font, const char* text, float target_width, float max_scale)
+{
+    if (font < 0 || font >= MAX_FONTS || !g_fonts[font].in_use || text == NULL) return max_scale;
+    int length = graphics_count_text_columns_compat(text);
+    float base_width = (float)length * g_fonts[font].width;
+    if (base_width <= 0.0f) return max_scale;
+    float scale = target_width / base_width;
+    return (scale > max_scale) ? max_scale : scale;
 }
 
 void graphics_draw_text_center(int font, const char *text, float x, float y, float size, uint32_t color)
@@ -1332,6 +1340,16 @@ int graphics_get_formatted_text_length(const char *text, void *item)
     }
 
     return length;
+}
+
+float graphics_get_text_formatted_scale_to_fit(int font, const char* text, void* item, float target_width, float max_scale)
+{
+    if (font < 0 || font >= MAX_FONTS || !g_fonts[font].in_use || text == NULL) return max_scale;
+    int length = graphics_get_formatted_text_length(text, item);
+    float base_width = (float)length * g_fonts[font].width;
+    if (base_width <= 0.0f) return max_scale;
+    float scale = target_width / base_width;
+    return (scale > max_scale) ? max_scale : scale;
 }
 
 void graphics_draw_text_formatted_center(int font, const char *text, void *item, float x, float y, float size, uint32_t color)
@@ -1567,8 +1585,22 @@ int graphics_load_wallpaper(const char *filename) {
         return -1;
     }
 
-    /* Use 32-bit for wallpapers to preserve gradients/details in full-screen backgrounds. */
-    int texture = graphics_load_texture_from_image(&image, 0, 0);
+    // For full-screen wallpapers, we explicitly squash the image to 512x272 
+    // to fit the PSP's display buffer perfectly.
+    struct Image squashed = image;
+    squashed.w = 512;
+    squashed.h = 272;
+    squashed.data = (uint8_t*)malloc(512 * 272 * 4);
+    float sx = (float)image.w / 512.0f;
+    float sy = (float)image.h / 272.0f;
+    for(int y=0; y<272; y++) {
+        for(int x=0; x<512; x++) {
+            ((uint32_t*)squashed.data)[y*512+x] = ((uint32_t*)image.data)[(int)(y*sy)*image.w + (int)(x*sx)];
+        }
+    }
+
+    int texture = graphics_load_texture_from_image(&squashed, 0, 0);
+    free(squashed.data);
     graphics_destroy_image(&image);
     return texture;
 }

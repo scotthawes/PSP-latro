@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../pspdev"
+		},
+		{
+			"path": "../qdrant"
 		}
 	],
 	"settings": {
