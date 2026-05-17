@@ -38,7 +38,7 @@ struct Texture
     int format;
     int bytes_per_pixel;
     int8_t edition;       /* GFX_EFFECT_* — non-negative = effect active */
-    int8_t seal;    
+    int8_t seal;          /* which seal overlay this card needs */
 };
 
 struct Font
@@ -1593,7 +1593,6 @@ bool graphics_get_texture_content_size(int texture, int *out_width, int *out_hei
 
     return true;
 }
-
 
 /* ---------------------------------------------------------------- */
 /*  Edition / seal effect application on loaded textures             */

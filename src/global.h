@@ -1118,11 +1118,6 @@ void graphics_set_offscreen_render_target();
 void graphics_unset_offscreen_render_target();
 void graphics_flush_quads();
 
-
-void graphics_set_offscreen_render_target();
-void graphics_unset_offscreen_render_target();
-void graphics_flush_quads();
-
 /**
  * High-level effect helpers (graphics_effects.c) — declared here to avoid
  * including the whole header file and to keep global.h as the central header.
