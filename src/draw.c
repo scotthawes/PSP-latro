@@ -892,8 +892,66 @@ static void gfx_overlay_card_tile(int texture, int tx, int ty)
     }
 }
 
+/* Copy the top-left TEXTURE_CARD_WIDTH × TEXTURE_CARD_HEIGHT joker-sprite
+ * from the swizzled tex_jokers atlas into the unswizzled scratch buffer at
+ * (0,0).  Joker atlas: 7 columns × 5 rows sprites per page; each sprite
+ * cell is (TEXTURE_CARD_WIDTH+2)×(TEXTURE_CARD_HEIGHT+2) with the sprite
+ * at the cell origin (1,1). */
+static void gfx_copy_joker_sprite_to_scratch(struct JokerType *joker_type)
+{
+    int grid_x = joker_type->u / 7;
+    int grid_y = joker_type->v / 5;
+
+    int spr_u = joker_type->u - grid_x * 7;   /* cell-local x (0-6) */
+    int spr_v = joker_type->v - grid_y * 5;   /* cell-local y (0-4) */
+
+    int tex_u = 1 + spr_u * (TEXTURE_CARD_WIDTH + 2);
+    int tex_v = 1 + spr_v * (TEXTURE_CARD_HEIGHT + 2);
+
+    int texture = tex_jokers[grid_x][grid_y];
+
+    const struct Texture *tex = &g_textures[texture];
+    if (!tex->in_use || tex->data == NULL) return;
+
+    int bpp    = tex->bytes_per_pixel;
+    int stride = tex->width * bpp;
+    int src_off = tex_v * stride + tex_u * bpp;
+
+    if (bpp == 2)
+    {
+        const uint8_t *src_row = tex->data + src_off;
+        for (int j = 0; j < TEXTURE_CARD_HEIGHT; j++)
+        {
+            const uint16_t *src = (const uint16_t *)(src_row + j * stride);
+            uint8_t *dst = g_edition_scratch + (size_t)j * EDITION_SCRATCH_W * 4;
+            for (int i = 0; i < TEXTURE_CARD_WIDTH; i++)
+            {
+                uint16_t p = src[i];
+                dst[i*4+0] = (uint8_t)(( p        & 0x0F) * 17);
+                dst[i*4+1] = (uint8_t)(((p >>  4) & 0x0F) * 17);
+                dst[i*4+2] = (uint8_t)(((p >>  8) & 0x0F) * 17);
+                dst[i*4+3] = (uint8_t)(((p >> 12) & 0x0F) * 17);
+            }
+        }
+    }
+    else
+    {
+        const uint8_t *src_row = tex->data + src_off;
+        for (int j = 0; j < TEXTURE_CARD_HEIGHT; j++)
+        {
+            memcpy(g_edition_scratch + (size_t)j * EDITION_SCRATCH_W * 4,
+                   src_row + j * stride,
+                   TEXTURE_CARD_WIDTH * 4);
+        }
+    }
+}
+
 /* ------------------------------------------------------------------ */
-/*  Public helper: build and draw a card with edition / time effect   */
+/*  Joker edition / effect pipeline                                   */
+/* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/*  Per-card edition / effect pipeline                                */
 /*                                                                     */
 /*  Call sequence:                                                     */
 /*   1. Build scratch RGBA8 buffer from base + enhancer + seal layers  */
@@ -1078,6 +1136,66 @@ void game_draw_card(struct Card *card, struct DrawObject *draw_override)
     }
 }
 
+static int game_draw_joker_edition_effect(struct Joker *joker,
+                                    float elapsed_s,
+                                    float x, float y, float w, float h,
+                                    int joker_filter)
+{
+    /* NEGATIVE uses the GPU-side LOGIC_OP path in game_draw_joker() */
+    if (joker->edition == CARD_EDITION_BASE || joker->edition == CARD_EDITION_NEGATIVE)
+        return -1;
+
+    struct JokerType *joker_type = &g_joker_types[joker->type];
+
+    /* ── 1. Clear scratch to transparent ─────────────────────────── */
+    memset(g_edition_scratch, 0, EDITION_SCRATCH_SIZE);
+
+    /* ── 2. Composite joker base sprite into scratch ─────────────── */
+    gfx_copy_joker_sprite_to_scratch(joker_type);
+
+    /* ── 3. Overlay enhancement ──────────────────────────────────── */
+    if (joker->enhancement != CARD_ENHANCEMENT_NONE)
+    {
+        gfx_overlay_card_tile(tex_enhancers,
+            g_enhancement_tex_coords[joker->enhancement].x,
+            g_enhancement_tex_coords[joker->enhancement].y);
+    }
+
+    /* ── 4. Scratch is about to be read by the effect worker; flush stale lines */
+    sceKernelDcacheWritebackInvalidateRange(g_edition_scratch, EDITION_SCRATCH_SIZE);
+
+    /* ── 5. Build edition params + seed ──────────────────────────── */
+    float card_seed = joker->draw.r / 255.0f;
+
+    GfxEffectParams params = graphics_build_edition_params_realtime(
+        joker->edition, card_seed, elapsed_s);
+
+    /* ── 6. Apply edition effect in-place on scratch ─────────────── */
+    graphics_effect_apply(g_edition_scratch,
+                          EDITION_SCRATCH_W, EDITION_SCRATCH_H, &params);
+
+    /* ── 8. Upload scratch → temp texture, draw full-quad ────────── */
+    int temp_tex = graphics_load_texture_from_raw_rgba("__joker_edition__",
+                                                        g_edition_scratch,
+                                                        TEXTURE_CARD_WIDTH,
+                                                        TEXTURE_CARD_HEIGHT);
+    if (temp_tex < 0) return -1;
+
+    int tile_u = g_editions_tex_coords[joker->edition].x;
+    int tile_v = g_editions_tex_coords[joker->edition].y;
+
+    graphics_set_texture(temp_tex, joker_filter);
+    graphics_draw_quad(x, y, w, h,
+                       tile_u, tile_v,
+                       TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT,
+                       COLOR_WHITE);
+    graphics_flush_quads();
+    graphics_destroy_texture(temp_tex);
+    graphics_set_no_texture();
+
+    return 0;
+}
+
 void game_draw_joker(struct Joker *joker)
 {
     int tex_joker_x, tex_joker_y = 0;
@@ -1131,9 +1249,13 @@ void game_draw_joker(struct Joker *joker)
     }
 
     if (joker->edition != CARD_EDITION_BASE && joker->edition != CARD_EDITION_NEGATIVE)
-    {        
-        graphics_set_texture(tex_editions, joker_filter);
-        graphics_draw_rotated_quad(x, y, w, h, g_editions_tex_coords[joker->edition].x, g_editions_tex_coords[joker->edition].y, TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, 0x7FFFFFFF, joker->draw.angle);
+    {
+        /* Lazily initialise the edition-animation anchor on first draw */
+        if (joker->edition_t0 <= 0.0f)
+            joker->edition_t0 = (float)g_time / 60.0f;
+
+        float elapsed = (float)g_time / 60.0f - joker->edition_t0;
+        game_draw_joker_edition_effect(joker, elapsed, x, y, w, h, joker_filter);
     }
 }
 

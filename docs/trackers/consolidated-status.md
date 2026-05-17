@@ -326,11 +326,28 @@ This file is the canonical snapshot of the repository state as of this commit. F
 
 ## Known blockers (call-site wiring gaps)
 
-### B-1 — `graphics_apply_texture_effect()` has no production call-site
+### B-1 — ~~`graphics_apply_texture_effect()` has no production call-site~~ ✅ RESOLVED
 
-`graphics_apply_texture_effect()` exists and is fully functional but is **not called from any game-loop path**. There is no per-frame entry point that retrieves an elapsed-time float and calls the dispatcher for animated effects (holographic, negative/negative-shine, polychrome, gold-seal, voucher, played). The `GfxEffectParams.time` field is populated only if the caller builds the params with a non-zero `game_time` argument via `graphics_build_edition_params_realtime()`.
+`graphics_apply_texture_effect()` exists at `graphics.c:1676` but the **per-frame animated card-effect pipeline** uses the pixel-buffer path via `game_draw_card_edition_effect()` instead (the texture-in-place API optimises load-time one-shot use and is not appropriate for per-frame animation).
 
-**Required to fix:** Wire an elapsed-time float into `game_draw()` (or `game_draw_card()`) and call `graphics_apply_texture_effect()` or `graphics_apply_edition_effect_inplace()` before the card texture draw call in `draw.c:802`.
+**Production call-site:** `draw.c:1048–1056` inside `game_draw_card()`.
+```c
+    if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE)
+    {
+        if (card->edition_t0 <= 0.0f)
+            card->edition_t0 = (float)g_time / 60.0f;
+        float elapsed = (float)g_time / 60.0f - card->edition_t0;
+        game_draw_card_edition_effect(card, elapsed, x, y, w, h, card_filter);
+    }
+```
+
+Wire chain:
+1. `game_draw_card()` — called for every on-screen card every frame (hand, played-hand, shop, booster, etc.)
+2. `game_draw_card_edition_effect()` — composites base+enhancer+seal into scratch, builds `GfxEffectParams` with non-zero `elapsed_s`, calls `graphics_effect_apply()` in-place on scratch
+3. `graphics_build_edition_params_realtime(edition, card_seed, elapsed_s)` — populates `GfxEffectParams.time`
+4. `graphics_effect_apply(pixels, w, h, &params)` — dispatches to per-edition worker (holographic, polychrome, foil, …)
+
+Call-site added in commit `cc686b5`; verified in `draw.c:1048–1056`.
 
 ### B-2 — `game_draw_card()` draws `tex_editions` statically; no effect routing
 
