@@ -439,6 +439,7 @@ void game_init_joker(struct Joker *joker)
     joker->param1 = 0;
     joker->repeat = 0;
     joker->value = g_joker_types[joker->type].value;
+    joker->edition_t0 = 0.0f;
     game_init_draw_object(&(joker->draw));
     switch(joker->type)
     {

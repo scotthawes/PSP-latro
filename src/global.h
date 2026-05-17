@@ -381,6 +381,7 @@ struct Joker
 
     uint8_t type;
     uint8_t edition;
+    float   edition_t0;    /* game-time anchor (seconds) for edition animation (mirrors Card.edition_t0) */
     int param1;
     int repeat;
 
@@ -410,6 +411,8 @@ struct Jokers
 #define PLANET_TYPE_ERIS        11
 
 #define PLANET_TYPE_COUNT       12
+
+#define POLYCHROME_FRAME_S 0.6667f
 
 #define HINT_PLANET_TYPE_LENGTH  4
 

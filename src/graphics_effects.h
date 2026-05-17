@@ -47,6 +47,7 @@ typedef struct
     float             negative_param_r;
     float             polychrome_param_r;
     float             polychrome_param_g;
+    int               polychrome_cycle;
     float             gold_seal_param_r;
     float             voucher_param_r;
     float             hologram_param_r;

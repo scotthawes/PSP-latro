@@ -1153,15 +1153,7 @@ static int game_draw_joker_edition_effect(struct Joker *joker,
     /* ── 2. Composite joker base sprite into scratch ─────────────── */
     gfx_copy_joker_sprite_to_scratch(joker_type);
 
-    /* ── 3. Overlay enhancement ──────────────────────────────────── */
-    if (joker->enhancement != CARD_ENHANCEMENT_NONE)
-    {
-        gfx_overlay_card_tile(tex_enhancers,
-            g_enhancement_tex_coords[joker->enhancement].x,
-            g_enhancement_tex_coords[joker->enhancement].y);
-    }
-
-    /* ── 4. Scratch is about to be read by the effect worker; flush stale lines */
+    /* ── 3. DCache flush before effect read ───────────────────────── */
     sceKernelDcacheWritebackInvalidateRange(g_edition_scratch, EDITION_SCRATCH_SIZE);
 
     /* ── 5. Build edition params + seed ──────────────────────────── */

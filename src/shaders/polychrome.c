@@ -10,7 +10,6 @@ static int gfx_apply_polychrome(uint8_t *pixels, int w, int h, const GfxEffectPa
 {
     if (pixels == NULL) return -1;
 
-    float time = p->time;
     float po_r = p->polychrome_param_r;
     float po_g = p->polychrome_param_g;
 
@@ -33,18 +32,13 @@ static int gfx_apply_polychrome(uint8_t *pixels, int w, int h, const GfxEffectPa
             gfx_RGB_to_HSL(r, g, b, &H, &S, &L);
             S = S * sat_fac;
 
-            float t = po_g * 2.221f + time;
-            float nx = ((float)i / (float)w) - 0.5f;
-            float ny = ((float)j / (float)h) - 0.5f;
-            float scaled = sqrtf(nx*nx + ny*ny) * 50.0f;
+            /* Palette stepping: discrete 0-39 cycle counter, stepping every
+             * POLYCHROME_FRAME_S (0.6667 s, i.e. ~40 frames at 60 Hz).
+             * The oscillating field above stays continuous; only the res palette
+             * offset is quantised to match the Balatro 40-frame colour cycle. */
+            float cycle_t = (float)p->polychrome_cycle;
 
-            float f1 = scaled + 50.0f * sinf(-t / 143.6340f);
-            float f2 = scaled + 50.0f * cosf( t / 53.1532f);
-            float field = (1.0f + (cosf(sqrtf(f1*f1 + ny*ny) / 19.483f)
-                                  + sinf(sqrtf(f2*f2 + ny*ny) / 33.155f) * cosf(ny / 15.73f)
-                                  + cosf(sqrtf(scaled*scaled + ny*ny) / 27.193f) * sinf(scaled / 21.92f))) / 2.0f;
-
-            float res = 0.5f + 0.5f * cosf(po_r * 2.612f + (field - 0.5f) * 3.14f);
+            float res = 0.5f + 0.5f * cosf(po_r * 2.612f + cycle_t);
             H += res + po_g * 0.04f;
             S = MIN(0.6f, S + 0.5f);
 

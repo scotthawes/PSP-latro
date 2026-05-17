@@ -132,7 +132,11 @@ GfxEffectParams graphics_build_edition_params_realtime(int edition, float card_s
 {
     GfxEffectParams p = graphics_build_edition_params(edition, card_seed);
     if (p.effect != GFX_EFFECT_NONE)
+    {
         p.time = game_time;
+        if (p.effect == GFX_EFFECT_POLYCHROME)
+            p.polychrome_cycle = (int)(game_time / POLYCHROME_FRAME_S) % 40;
+    }
     return p;
 }
 
