@@ -908,6 +908,47 @@ int graphics_load_texture_16bit(const char *filename, int start_x, int start_y)
     return texture_slot;
 }
 
+int graphics_load_texture_from_raw_rgba(const char *label, const uint8_t *pixels, int width, int height)
+{
+    if (g_texture_count >= MAX_TEXTURES) return -1;
+
+    int pow2_w = get_closest_power_of_2(width);
+    int pow2_h = get_closest_power_of_2(height);
+    if (pow2_w <= 0 || pow2_h <= 0) return -1;
+
+    int texture_slot = 0;
+    while (g_textures[texture_slot].in_use)
+        texture_slot++;
+
+    /* Swizzle linear RGBA8 -> GPU layout */
+    uint8_t *linear = (uint8_t *)malloc((size_t)pow2_w * (size_t)pow2_h * 4);
+    if (linear == NULL) return -1;
+    memset(linear, 0, (size_t)pow2_w * (size_t)pow2_h * 4);
+    /* copy only the valid region */
+    for (int j = 0; j < height && j < pow2_h; j++)
+        memcpy(linear + (size_t)j * pow2_w * 4, pixels + (size_t)j * width * 4, (size_t)width * 4);
+
+    uint8_t *swizzled = (uint8_t *)memalign(16, pow2_w * pow2_h * 4);
+    if (swizzled == NULL) { free(linear); return -1; }
+    swizzle_fast(swizzled, linear, pow2_w * 4, pow2_h);
+    free(linear);
+
+    g_textures[texture_slot].in_use         = true;
+    g_textures[texture_slot].width          = pow2_w;
+    g_textures[texture_slot].height         = pow2_h;
+    g_textures[texture_slot].content_width  = width;
+    g_textures[texture_slot].content_height = height;
+    g_textures[texture_slot].data           = swizzled;
+    g_textures[texture_slot].format         = GU_PSM_8888;
+    g_textures[texture_slot].bytes_per_pixel = 4;
+    sceKernelDcacheWritebackInvalidateAll();
+
+    DEBUG_PRINTF("[TEX][RAW-RGBA] slot=%d %dx%d (%dx%d) label=%s\n",
+                 texture_slot, width, height, pow2_w, pow2_h, label);
+
+    return texture_slot;
+}
+
 int graphics_load_font(const char *filename, int width, int height, int length_x, int length_y)
 {
     if (g_font_count >= MAX_FONTS)

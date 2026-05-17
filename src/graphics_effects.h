@@ -109,3 +109,21 @@ int  graphics_effect_apply(uint8_t *pixels, int width, int height,
  * time-dependent or otherwise animated).  Called once per frame.
  */
 bool graphics_effect_is_animated(GfxEffect effect);
+
+/* ------------------------------------------------------------------ */
+/*  Flash overlay API                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Trigger the white flash overlay for @p duration_s seconds.
+ * Safe to call when already active — the timer is extended to cover
+ * the longer of current-remaining and @p duration_s.
+ */
+void gfx_effect_trigger_flash(float duration_s);
+
+/**
+ * Advance the flash timer by one seconds-tick.
+ * Should be called once per game-tick (or once per frame) from the
+ * main update loop.  Returns true if the overlay is still visible.
+ */
+bool gfx_effect_update_flash(float dt_s);

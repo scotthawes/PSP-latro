@@ -1,4 +1,5 @@
 #include "global.h"
+#include <string.h>
 
 /* Format a non-negative double as an integer with thousands commas.
  * Falls back to %g for values >= 1e15 (scores that need scientific notation). */
@@ -799,6 +800,173 @@ static void game_apply_shop_item_pixel_snap(float *x, float *y)
     }
 }
 
+/* ================================================================== */
+/*  Per-card edition / effect pipeline                                */
+/* ================================================================== */
+
+/*
+ * Scratch buffer: 128 × 128 RGBA8 (power-of-2 for PSP texture upload).
+ * 69×93 card sprite fits in the top-left; rest is zero padding via memset.
+ */
+#define EDITION_SCRATCH_W   128
+#define EDITION_SCRATCH_H   128
+#define EDITION_SCRATCH_SIZE (EDITION_SCRATCH_W * EDITION_SCRATCH_H * 4)
+static uint8_t g_edition_scratch[EDITION_SCRATCH_SIZE];
+
+/* Copy the top-left TEXTURE_CARD_WIDTH × TEXTURE_CARD_HEIGHT region from a
+ * swizzled texture into the unswizzled scratch buffer at (0,0). */
+static void gfx_copy_card_sprite_to_scratch(int texture, int u, int v)
+{
+    const struct Texture *tex = &g_textures[texture];
+    if (!tex->in_use || tex->data == NULL) return;
+
+    int bpp    = tex->bytes_per_pixel;   /* 2 for deck (4444), 2 for enhancers (4444) */
+    int stride = tex->width * bpp;
+
+    /* Unswizzle a TEXTURE_CARD_WIDTH × TEXTURE_CARD_HEIGHT window */
+    int src_off = v * stride + u * bpp;
+
+    if (bpp == 2)
+    {
+        /* 4444 → RGBA8 expansion while unswizzling */
+        const uint8_t *src_row = tex->data + src_off;
+        for (int j = 0; j < TEXTURE_CARD_HEIGHT; j++)
+        {
+            const uint16_t *src = (const uint16_t *)(src_row + j * stride);
+            uint8_t *dst = g_edition_scratch + (size_t)j * EDITION_SCRATCH_W * 4;
+            for (int i = 0; i < TEXTURE_CARD_WIDTH; i++)
+            {
+                uint16_t p = src[i];
+                /* ARGB 4444 → RGBA 8888 */
+                dst[i*4+0] = (uint8_t)(( p        & 0x0F) * 17);
+                dst[i*4+1] = (uint8_t)(((p >>  4) & 0x0F) * 17);
+                dst[i*4+2] = (uint8_t)(((p >>  8) & 0x0F) * 17);
+                dst[i*4+3] = (uint8_t)(((p >> 12) & 0x0F) * 17);
+            }
+        }
+    }
+    else
+    {
+        /* 8888 direct copy */
+        const uint8_t *src_row = tex->data + src_off;
+        for (int j = 0; j < TEXTURE_CARD_HEIGHT; j++)
+        {
+            memcpy(g_edition_scratch + (size_t)j * EDITION_SCRATCH_W * 4,
+                   src_row + j * stride,
+                   TEXTURE_CARD_WIDTH * 4);
+        }
+    }
+}
+
+/* Alpha-blend an enhancement / seal tile (TEXTURE_CARD_WIDTH ×
+ * TEXTURE_CARD_HEIGHT, 4444 format) from @p texture over the scratch
+ * buffer at tile position (tx, ty). */
+static void gfx_overlay_card_tile(int texture, int tx, int ty)
+{
+    const struct Texture *tex = &g_textures[texture];
+    if (!tex->in_use || tex->data == NULL) return;
+
+    int bpp    = tex->bytes_per_pixel;
+    int stride = tex->width * bpp;
+    int src_off = ty * stride + tx * bpp;
+
+    const uint8_t *src_row = tex->data + src_off;
+    for (int j = 0; j < TEXTURE_CARD_HEIGHT && j < EDITION_SCRATCH_H; j++)
+    {
+        const uint16_t *src = (const uint16_t *)(src_row + j * stride);
+        uint8_t *dst = g_edition_scratch + (size_t)j * EDITION_SCRATCH_W * 4;
+        for (int i = 0; i < TEXTURE_CARD_WIDTH && i < EDITION_SCRATCH_W; i++)
+        {
+            uint16_t p = src[i];
+            uint8_t pr = (uint8_t)(( p        & 0x0F) * 17);
+            uint8_t pg = (uint8_t)(((p >>  4) & 0x0F) * 17);
+            uint8_t pb = (uint8_t)(((p >>  8) & 0x0F) * 17);
+            uint8_t pa = (uint8_t)(((p >> 12) & 0x0F) * 17);   /* alpha 0-15 */
+            if (pa == 0) continue;   /* fully transparent tile pixel — skip */
+            float af = pa / 255.0f;
+            dst[i*4+0] = (uint8_t)(pr * af + dst[i*4+0] * (1.0f - af));
+            dst[i*4+1] = (uint8_t)(pg * af + dst[i*4+1] * (1.0f - af));
+            dst[i*4+2] = (uint8_t)(pb * af + dst[i*4+2] * (1.0f - af));
+            dst[i*4+3] = 255;
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Public helper: build and draw a card with edition / time effect   */
+/*                                                                     */
+/*  Call sequence:                                                     */
+/*   1. Build scratch RGBA8 buffer from base + enhancer + seal layers  */
+/*   2. Apply edition effect to scratch in-place                       */
+/*   3. Upload scratch as a temporary 8888 texture                     */
+/*   4. Draw full-screen quad textured from the scratch                */
+/*   5. Forget the temp texture (no texture-ID leak)                   */
+/* ------------------------------------------------------------------ */
+int game_draw_card_edition_effect(struct Card *card,
+                                  float elapsed_s,
+                                  float x, float y, float w, float h,
+                                  int card_filter)
+{
+    if (card->edition == CARD_EDITION_BASE || card->edition == CARD_EDITION_NEGATIVE)
+        return -1;
+
+    /* ── 1. Clear scratch to transparent ─────────────────────────── */
+    memset(g_edition_scratch, 0, EDITION_SCRATCH_SIZE);
+
+    /* ── 2. Composite base card face into scratch ────────────────── */
+    int base_tex = (card->rank < 7) ? tex_deck : tex_deck2;
+    int base_u   = 1 + (TEXTURE_CARD_WIDTH + 2) * (card->rank < 7 ? card->rank : card->rank - 7);
+    int base_v   = 1 + (TEXTURE_CARD_HEIGHT + 2) * card->suit;
+    gfx_copy_card_sprite_to_scratch(base_tex, base_u, base_v);
+
+    /* ── 3. Overlay enhancement (except STONE — uses its own sprite) */
+    if (card->enhancement != CARD_ENHANCEMENT_STONE)
+    {
+        gfx_overlay_card_tile(tex_enhancers,
+            g_enhancement_tex_coords[card->enhancement].x,
+            g_enhancement_tex_coords[card->enhancement].y);
+    }
+
+    /* ── 4. Overlay seal ─────────────────────────────────────────── */
+    if (card->seal != CARD_SEAL_NONE)
+    {
+        gfx_overlay_card_tile(tex_enhancers,
+            g_seal_tex_coords[card->seal].x,
+            g_seal_tex_coords[card->seal].y);
+    }
+
+    /* ── 5. Build edition params + seed ──────────────────────────── */
+    float card_seed = card->draw.r / 255.0f;
+
+    GfxEffectParams params = graphics_build_edition_params_realtime(
+        card->edition, card_seed, elapsed_s);
+
+    /* ── 6. Apply edition effect in-place on scratch ─────────────── */
+    graphics_effect_apply(g_edition_scratch,
+                          EDITION_SCRATCH_W, EDITION_SCRATCH_H, &params);
+
+    /* ── 7. Upload scratch → temp texture, draw full-quad ────────── */
+    int temp_tex = graphics_load_texture_from_raw_rgba("__edition_effect__",
+                                                        g_edition_scratch,
+                                                        TEXTURE_CARD_WIDTH,
+                                                        TEXTURE_CARD_HEIGHT);
+    if (temp_tex < 0) return -1;
+
+    int tile_u = g_editions_tex_coords[card->edition].x;
+    int tile_v = g_editions_tex_coords[card->edition].y;
+
+    graphics_set_texture(temp_tex, card_filter);
+    graphics_draw_quad(x, y, w, h,
+                       tile_u, tile_v,
+                       TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT,
+                       COLOR_WHITE);
+    graphics_flush_quads();
+    graphics_destroy_texture(temp_tex);
+    graphics_set_no_texture();
+
+    return 0;
+}
+
 void game_draw_card(struct Card *card, struct DrawObject *draw_override)
 {
     struct DrawObject *draw = &card->draw;
@@ -834,10 +1002,57 @@ void game_draw_card(struct Card *card, struct DrawObject *draw_override)
         }
     }
 
+    /* ── Dissolve overlay — scratch→pixel pipeline for Mr. Bones / card-death ──── */
+    if (card->dissolving && card->dissolve >= 0.0f)
+    {
+        graphics_flush_quads();
+
+        GfxEffectParams p = {0};
+        p.effect    = GFX_EFFECT_DISSOLVE;
+        p.time      = card->dissolve;
+        p.dissolve  = card->dissolve;
+
+        int d_base_tex = (card->rank < 7) ? tex_deck : tex_deck2;
+        int d_base_u   = 1 + (TEXTURE_CARD_WIDTH + 2) * (card->rank < 7 ? card->rank : card->rank - 7);
+        int d_base_v   = 1 + (TEXTURE_CARD_HEIGHT + 2) * card->suit;
+
+        memset(g_edition_scratch, 0, EDITION_SCRATCH_SIZE);
+        gfx_copy_card_sprite_to_scratch(d_base_tex, d_base_u, d_base_v);
+        if (card->enhancement != CARD_ENHANCEMENT_STONE)
+        {
+            gfx_overlay_card_tile(tex_enhancers,
+                g_enhancement_tex_coords[card->enhancement].x,
+                g_enhancement_tex_coords[card->enhancement].y);
+        }
+
+        graphics_effect_apply(g_edition_scratch,
+                              TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, &p);
+
+        int d_temp_tex = graphics_load_texture_from_raw_rgba("__card_dissolve__",
+                                                              g_edition_scratch,
+                                                              TEXTURE_CARD_WIDTH,
+                                                              TEXTURE_CARD_HEIGHT);
+        if (d_temp_tex >= 0)
+        {
+            graphics_set_texture(d_temp_tex, card_filter);
+            graphics_draw_quad(x, y, w, h,
+                               0, 0, TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT,
+                               COLOR_WHITE);
+            graphics_flush_quads();
+            graphics_destroy_texture(d_temp_tex);
+        }
+        graphics_set_no_texture();
+    }
+    /* ── End dissolve pass ─────────────────────────────────────────────────── */
+
     if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE)
-    {        
-        graphics_set_texture(tex_editions, card_filter);
-        graphics_draw_rotated_quad(x, y, w, h, g_editions_tex_coords[card->edition].x, g_editions_tex_coords[card->edition].y, TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, 0x7FFFFFFF, card->draw.angle);
+    {
+        /* Lazily initialise the edition-animation anchor on first draw */
+        if (card->edition_t0 <= 0.0f)
+            card->edition_t0 = (float)g_time / 60.0f;
+
+        float elapsed = (float)g_time / 60.0f - card->edition_t0;
+        game_draw_card_edition_effect(card, elapsed, x, y, w, h, card_filter);
     }
 
     if (card->seal != CARD_SEAL_NONE)
@@ -2331,8 +2546,6 @@ int g_frame_count;
 
 void game_draw_debug_info()
 {
-    g_time++;
-
     if (last_tick == 0) { sceRtcGetCurrentTick(&last_tick); }
     if (tick_res == 0) { tick_res = sceRtcGetTickResolution(); }
 
@@ -2408,6 +2621,8 @@ static void game_draw_background_depth_layers()
 void game_draw()
 {
     graphics_begin_draw();
+    g_time++;
+
     graphics_clear(COLOR_BACKGROUND_2);
 
     if (g_game_state.stage == GAME_STAGE_BLINDS ||
@@ -2449,6 +2664,34 @@ void game_draw()
     if (g_settings.debug_overlay)
     {
         game_draw_debug_info();
+    }
+
+    /* white flash overlay — runs flash.fs against a copy of the rendered frame */
+    if (g_flash_state.active && g_flash_state.remaining_s > 0.0f)
+    {
+        GfxEffectParams p = {0};
+        p.effect     = GFX_EFFECT_FLASH;
+        p.time       = g_flash_state.remaining_s;
+        p.mid_flash  = 1.0f;
+
+        /* 512 × 272 RGBA8 unswizzled scratch buffer (BUFFER_WIDTH × 4 bytes per row) */
+        static uint8_t flash_scratch[BUFFER_WIDTH * BUFFER_HEIGHT * 4];
+        memset(flash_scratch, 0, sizeof(flash_scratch));
+
+        /* gfx_apply_flash reads the input buffer and writes blended white in-place */
+        gfx_apply_flash(flash_scratch, BUFFER_WIDTH, BUFFER_HEIGHT, &p);
+
+        int temp_tex = graphics_load_texture_from_raw_rgba("__flash_overlay__",
+                                                          flash_scratch, BUFFER_WIDTH, BUFFER_HEIGHT);
+        if (temp_tex >= 0)
+        {
+            graphics_set_texture(temp_tex, GRAPHICS_TEXTURE_FILTER_NEAREST);
+            graphics_draw_quad(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT,
+                               0, 0, BUFFER_WIDTH, BUFFER_HEIGHT, COLOR_WHITE);
+            graphics_flush_quads();
+            graphics_destroy_texture(temp_tex);
+        }
+        graphics_set_no_texture();
     }
 
     graphics_end_draw();
