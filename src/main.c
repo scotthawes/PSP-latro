@@ -8,6 +8,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #include "ini.c"
 #include "audio.c"
 #include "graphics.c"
+#include "graphics_effects.c"
 #include "input.c"
 #include "draw.c"
 #include "game_util.c"
