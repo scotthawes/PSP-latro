@@ -180,11 +180,6 @@ static void menu_load_logo_variant(int variant)
         s_title_logo_textures[variant] = menu_load_ui_texture("title_logo_fallback", MENU_TITLE_LOGO_FALLBACK_PATH, true);
     }
 
-    if (s_title_ace_card_texture < 0)
-    {
-        s_title_ace_card_texture = menu_load_ui_texture("title_ace_card", MENU_TITLE_ACE_CARD_PATH, true);
-    }
-
 }
 
 static void menu_apply_active_variant_assets()
@@ -435,8 +430,17 @@ static void menu_init_wallpapers()
     }
     s_title_wallpaper_textures[1] = s_title_wallpaper_textures[0];
 
-    // Load title logo textures + Ace card at startup so first frame has valid handles.
+    // Load title logo texture at startup so first frame has valid handles.
     menu_load_logo_variant(0);
+    if (s_title_ace_card_texture < 0)
+    {
+        s_title_ace_card_texture = menu_load_ui_texture("title_ace_card", MENU_TITLE_ACE_CARD_PATH, false);
+        if (s_title_ace_card_texture < 0)
+        {
+            DEBUG_PRINTF("[MENU][MISSING] key=title_ace_card path=%s\n", MENU_TITLE_ACE_CARD_PATH);
+        }
+    }
+
     if (s_wallpaper_variant != 0)
     {
         menu_load_logo_variant(s_wallpaper_variant);
@@ -496,12 +500,14 @@ void menu_draw_wallpaper(int texture_id) {
         content_h = SCREEN_HEIGHT;
     }
 
-    // Wallpaper is now downsampled during load to fit within the 
-    // PSP's 512px sampler limit, ensuring the full image is visible.
+    // Wallpaper is loaded at 512x272, but screen is 480x272.
+    // Scale UV coordinates so the wallpaper maps 1:1 to screen pixels horizontally.
+    float uv_scale_x = (float)SCREEN_WIDTH / (float)content_w;
+
     graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_LINEAR);
     graphics_draw_quad(0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT,
                        0, 0,
-                       (int16_t)content_w, (int16_t)content_h,
+                       (int16_t)(content_w * uv_scale_x), (int16_t)content_h,
                        0xFFFFFFFF);
 }
 
@@ -510,10 +516,8 @@ void menu_draw_wallpaper(int texture_id) {
 // ----------------------------------------------------------------
 static void menu_draw_title()
 {
-    const float title_logo_scale = 1.00f;
-    const float title_logo_y = 75.0f;
-    const float title_ace_scale = 0.50f;
-    const float title_ace_y_offset = 40.0f;
+    const float title_logo_scale = 0.40f;  // Reduced to fit well on 480px screen
+    const float title_logo_y = 60.0f;
 
     menu_init_wallpapers();
     menu_draw_wallpaper(s_title_wallpaper_texture);
@@ -550,22 +554,16 @@ static void menu_draw_title()
         graphics_draw_text_center(font_big, "A S P A D E S S T R A T E G Y G A M E", SCREEN_WIDTH / 2.0f, 92.0f, 0.8f, 0xFFC8D6E8);
     }
 
-    // --- Draw Ace card independently (after logo, so we can use logo_y) ---
+    // --- Draw ace card below logo ---
     if (s_title_ace_card_texture >= 0 && logo_drawn)
     {
-        int ace_w = 0, ace_h = 0;
-        if (!graphics_get_texture_content_size(s_title_ace_card_texture, &ace_w, &ace_h))
-        {
-            ace_w = 71;
-            ace_h = 95;
-        }
-        float ace_scale = title_ace_scale;
+        float ace_scale = 0.20f;  // Scaled for PSP screen
+        int ace_w = 71, ace_h = 95;  // Default ace card texture size
+        graphics_get_texture_content_size(s_title_ace_card_texture, &ace_w, &ace_h);
         float ace_draw_w = ace_w * ace_scale;
         float ace_draw_h = ace_h * ace_scale;
-        // Center on logo lockup and keep card fully visible at top.
         float ace_x = (SCREEN_WIDTH - ace_draw_w) * 0.5f;
-        float ace_y = logo_y + title_ace_y_offset;
-        menu_validate_rect("title_ace_card", ace_x, ace_y, ace_draw_w, ace_draw_h);
+        float ace_y = title_logo_y + logo_draw_h + 100.0f;
         graphics_set_texture(s_title_ace_card_texture, GRAPHICS_TEXTURE_FILTER_LINEAR);
         graphics_draw_quad(ace_x, ace_y, ace_draw_w, ace_draw_h, 0, 0, ace_w, ace_h, 0xFFFFFFFF);
     }
@@ -844,16 +842,10 @@ void menu_draw()
 // ----------------------------------------------------------------
 void menu_input_title(bool no_input)
 {
-    char logbuf[128];
     if (no_input) return;
 
-    snprintf(logbuf, sizeof(logbuf), "menu_input_title: cross=%d", 
-             input_was_button_pressed(INPUT_BUTTON_CROSS));
-    boot_log(logbuf);
-    
     if (input_was_button_pressed(INPUT_BUTTON_CROSS))
     {
-        boot_log("Cross pressed, transitioning to main menu");
         g_game_state.sub_stage = GAME_SUBSTAGE_MENU_MAIN;
         g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_MAIN;
         g_game_state.menu_selected_item = MENU_MAIN_ITEM_NEW_RUN;

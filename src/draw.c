@@ -29,8 +29,7 @@ static void fmt_num(char *buf, double n)
 #define PSP_TEX_CARD_WIDTH   17
 #define PSP_TEX_CARD_HEIGHT  23
 
-int tex_enhancers, tex_deck, tex_deck2, tex_gamepad_ui, tex_editions, tex_shop, tex_ui_assets, tex_blind_chips, tex_title_bg_alt;
-int tex_blind_background;
+int tex_enhancers, tex_deck, tex_deck2, tex_gamepad_ui, tex_editions, tex_shop, tex_ui_assets, tex_blind_chips, tex_blind_background;
 int tex_jokers[2][4];
 int tex_tarots[2][2];
 int tex_boosters[2];
@@ -424,8 +423,6 @@ bool game_init_draw()
 
     tex_blind_chips = game_load_texture_16bit_with_fallback("blind_chips", "resources/textures/1x/BlindChips.png", "balatro-textures/1x/BlindChips.png");
     if (tex_blind_chips < 0) return false;
-
-    tex_title_bg_alt = graphics_load_texture("assets/backgrounds/background.png", 0, 0);
 
     tex_blind_background = graphics_load_wallpaper("assets/wallpapers/galaxy_15_psp.png");
     if (tex_blind_background < 0)
@@ -2408,55 +2405,6 @@ static void game_draw_background_depth_layers()
     }
 }
 
-void game_draw_title_screen()
-{
-    // Debugging: Draw a solid background to ensure the screen is not entirely black due to drawing issues.
-    graphics_set_no_texture();
-    graphics_draw_solid_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF0000FF); // Bright blue background to indicate drawing is active
-
-    // 1. Draw the Background (balatro_bg_alt.png)
-    if (tex_title_bg_alt >= 0) {
-        // We sample the full 512x272 buffer which contains the squashed wallpaper.
-        graphics_set_texture(tex_title_bg_alt, GRAPHICS_TEXTURE_FILTER_LINEAR);
-        graphics_draw_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 512, 272, COLOR_WHITE);
-    } else {
-        // Fallback if background texture failed to load
-        graphics_set_no_texture();
-        graphics_draw_solid_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF800000); // Dark red fallback
-        if (font_small >= 0) graphics_draw_text_center(font_small, "BG Texture Missing!", SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f - 20.0f, 1.0f, COLOR_WHITE);
-    }
-
-    // 2. Draw the Mascot Card (Ace of Spades)
-    struct Card ace;
-    memset(&ace, 0, sizeof(struct Card));
-    ace.rank = 12; // Ace
-    ace.suit = 0;  // Spades
-    
-    // Scale reduced to 1.0f to allow the logo to be visible and fix layout crowding.
-    ace.draw.scale = 1.0f;
-    ace.draw.x = (SCREEN_WIDTH / 2.0f) - (CARD_WIDTH / 2.0f);
-    ace.draw.y = (SCREEN_HEIGHT / 2.0f) - (CARD_HEIGHT / 2.0f) + 35.0f;
-    
-    // Subtle float animation
-    ace.draw.angle = sinf(g_game_counter * 0.04f) * 0.04f;
-    ace.draw.alpha = 1.0f;
-    
-    // Only draw the card if the main deck texture is loaded, and fonts are available for potential debug messages.
-    // Assuming tex_deck is the primary texture for cards.
-    if (tex_deck >= 0 && font_small >= 0) {
-        game_draw_card(&ace, NULL);
-    } else {
-        graphics_set_no_texture();
-        graphics_draw_solid_quad(SCREEN_WIDTH / 2.0f - 50.0f, SCREEN_HEIGHT / 2.0f + 20.0f, 100.0f, 50.0f, 0xFF008080); // Teal fallback
-        if (font_small >= 0) graphics_draw_text_center(font_small, "Card Texture Missing!", SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f + 40.0f, 1.0f, COLOR_WHITE);
-    }
-
-    // 4. Draw the Prompt
-    float prompt_y = SCREEN_HEIGHT * 0.88f;
-    uint32_t text_color = (g_game_counter % 60 < 30) ? COLOR_WHITE : 0xFFCCCCCC;
-    if (font_small >= 0) graphics_draw_text_center(font_small, "PRESS X", SCREEN_WIDTH / 2.0f, prompt_y, 1.0f, text_color);
-}
-
 void game_draw()
 {
     graphics_begin_draw();
@@ -2473,7 +2421,7 @@ void game_draw()
     switch (g_game_state.stage)
     {
         case GAME_STAGE_MENU:
-            game_draw_title_screen();
+            menu_draw();
             break;
         case GAME_STAGE_BLINDS:
             game_draw_blind_select();            
