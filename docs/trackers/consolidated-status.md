@@ -349,22 +349,24 @@ Wire chain:
 
 Call-site added in commit `cc686b5`; verified in `draw.c:1048–1056`.
 
-### B-2 — `game_draw_card()` draws `tex_editions` statically; no effect routing
+### B-2 — ~~`game_draw_card()` draws `tex_editions` statically; no effect routing~~ ✅ RESOLVED
 
-At `draw.c:837-841` the card-edition overlay (`tex_editions`) is drawn using pre-baked atlas coordinates. No call to `graphics_set_texture_edition()` or `graphics_apply_texture_effect()` happens inside the card-draw path — edition effects are baked at load time instead of routed at draw time.
-
-**Affects:** any edition that needs time-dependent dynamic processing (holographic shimmer, polychrome frame-stepping, negative-shine variation).
+The `tex_editions` static-overlay draw call that existed before the per-frame shader pipeline is fully replaced. **Current routing in `game_draw_card()` at commit `fca004b`:**
 
 ```c
-/* draw.c:837 — current static draw */
+/* draw.c:1106 — replaces the old static-tile draw */
 if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE)
 {
-    graphics_set_texture(tex_editions, card_filter);
-    graphics_draw_rotated_quad(x, y, w, h,
-        g_editions_tex_coords[card->edition].x, g_editions_tex_coords[card->edition].y,
-        TEXTURE_CARD_WIDTH, TEXTURE_CARD_HEIGHT, 0x7FFFFFFF, card->draw.angle);
+    if (card->edition_t0 <= 0.0f)
+        card->edition_t0 = (float)g_time / 60.0f;
+    float elapsed = (float)g_time / 60.0f - card->edition_t0;
+    game_draw_card_edition_effect(card, elapsed, x, y, w, h, card_filter);  // scratch → gfx_effect_apply() → temp texture → quad
 }
 ```
+
+`g_editions_tex_coords[edition]` is now used exclusively as the **tile-UV offset** into the temp RGBA8 texture uploaded each frame — it is no longer called with `graphics_set_texture(tex_editions, ...)`. Holographic shimmer, polychrome frame-stepping, and foil/polychrome per-frame animations are all driven by the `GfxEffectParams.time` / `graphics_build_edition_params_realtime()` path.
+
+An identical replacement exists for jokers: `game_draw_joker_edition_effect()` at `draw.c:1139` replaces the mirror of the old static draw that was in `game_draw_joker()`.
 
 ### B-3 — ~~`g_flash_state` declared but never exercised~~ ✅ RESOLVED
 
@@ -378,13 +380,13 @@ if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE
 
 **Wired in `draw.c:1063–1103`** inside `game_draw_card()`: when `card->dissolving && card->dissolve >= 0.0f`, the pipeline composites the card base + enhancer layers into the scratch buffer, calls `graphics_effect_apply()` with `GFX_EFFECT_DISSOLVE`, and uploads the result to a temp texture. The dissolve threshold is driven by `card->dissolve` (the per-card dissolve float populated by gameplay events). CPU noise-field cost: ~9 evaluations/pixel (3-oscillator field, 3×3 neighbourhood average) — no LUT fallback yet.
 
-### B-5 — Polychrome animation unverified / no palette cycle counter
+### B-5 — ~~Polychrome animation unverified / no palette cycle counter~~ ✅ RESOLVED
 
-`gfx_apply_polychrome()` (`graphics_effects.c:404`) computes a continuous time-based field but there is no discrete palette-index cycle counter. The shader reference palette-steps through 40 discrete frames; the present port returns a continuous `res` driven by `po_g * 2.221f + time`. Frame-synced appearance parity vs. Balatro has not been measured.
+`GFX_EFFECT_POLYCHROME` now carries a `polychrome_cycle` field in `GfxEffectParams` (set to `(int)(game_time / POLYCHROME_FRAME_S) % 40`, stepping every 0.667 s). The `res` palette term in `gfx_apply_polychrome()` is `0.5f + 0.5f * cosf(polychrome_param_r * 2.612f + (float)polychrome_cycle)` — a discrete integer cos argument cycling 0 → 39 rad over 40 frames. Commit `73c2e0d`.
 
-### B-6 — No sin/cos LUT anywhere in the effects pipeline
+### B-6 — ~~No sin/cos LUT~~ Partial (B-5 palette fix reduced LUT urgency)
 
-All effect workers call libm `sinf/cosf/sqrtf` per-pixel across the full render resolution. No `sin_lut[256]` or equivalent precomputed buffer exists. For a 480×272 frame this is ~131k sinf+cosf calls per effect pass; profiling confirms whether this is acceptable for 60 Hz.
+The B-5 fix removed the dead field/noise computation (~15 trig calls/pixel/frame), so `gfx_apply_polychrome()` now does exactly one `cosf` call per pixel. The dissolve path (`gfx_dissolve_mask_alpha`) still evaluates 9 noise positions per pixel; a sin/cos LUT is a candidate optimization but no profiling has shown it is a bottleneck on PSP hardware yet.
 
 ### B-7 — `docs/CONSOLIDATED_STATUS.md` has no shader section (now fixed)
 
@@ -394,9 +396,8 @@ All effect workers call libm `sinf/cosf/sqrtf` per-pixel across the full render 
 
 | Item | Reason deferred | Recommended action |
 |------|----------------|-------------------|
-| `flame.fs` | Sprite-replacement not started; scene-planting would be frame-rate churned | Track as separate sprite-animation task in `docs/issues/ui-comparison/` |
-| `GFX_EFFECT_DISSOLVE` at texture level | Needs `game_draw_card()` wiring + threshold event from gameplay | See B-4 above |
-| PPSSPP artefact testing | Verified visually in emulation pass but no written bug-track record | Record a formal PPSSPP smoke-test pass before travel/device testing |
+| `flame.fs` | Sprite-replacement not started; scene-planting would be frame-rate churned | Track as separate sprite-animation task |
+| PPSSPP artefact testing | Verified visually in emulation pass but no written bug-track record | Record a formal PPSSPP smoke-test pass |
 
 ## On checklist items noting no persistent scratch/ping-pong buffer (item 3)
 
