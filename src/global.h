@@ -43,7 +43,17 @@
 
 void boot_log(const char *message);
 
+#include "graphics_effects.h"
+
 extern uint32_t g_game_counter;
+
+/* flash.fs equivalent — trigger state for win/score animations */
+struct FlashState
+{
+    bool        active;
+    float       remaining_s;
+};
+extern struct FlashState g_flash_state;
 
 struct Settings
 {
@@ -159,7 +169,13 @@ struct Card
 
     uint8_t enhancement, edition, seal;
 
-    bool selected;    
+    bool selected;
+
+    /* Per-card animation / effect state */
+    float      dissolve;         /* 0 = opaque → 1 = fully dissolved (dissolve card animation); -1 = not dissolving */
+    float      score_counter;    /* counts up while a card is being evaluated */
+    float      edition_t0;       /* game-time anchor (seconds) for edition animation */
+    bool       dissolving;       /* true → card is in active dissolve animation */
 };
 
 #define MAX_CARDS  1024
@@ -365,6 +381,7 @@ struct Joker
 
     uint8_t type;
     uint8_t edition;
+    float   edition_t0;    /* game-time anchor (seconds) for edition animation (mirrors Card.edition_t0) */
     int param1;
     int repeat;
 
@@ -394,6 +411,8 @@ struct Jokers
 #define PLANET_TYPE_ERIS        11
 
 #define PLANET_TYPE_COUNT       12
+
+#define POLYCHROME_FRAME_S 0.6667f
 
 #define HINT_PLANET_TYPE_LENGTH  4
 
@@ -1184,6 +1203,7 @@ int graphics_load_texture_from_archive_16bit(const char *filename, int start_x, 
 int graphics_load_texture(const char *filename, int start_x, int start_y);
 int graphics_load_texture_16bit(const char *filename, int start_x, int start_y);
 int graphics_load_wallpaper(const char *filename);
+int graphics_load_texture_from_raw_rgba(const char *label, const uint8_t *pixels, int width, int height);
 bool graphics_get_texture_content_size(int texture, int *out_width, int *out_height);
 void graphics_destroy_texture(int texture);
 int graphics_load_font(const char *filename, int width, int height, int length_x, int length_y);

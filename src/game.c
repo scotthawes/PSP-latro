@@ -439,6 +439,7 @@ void game_init_joker(struct Joker *joker)
     joker->param1 = 0;
     joker->repeat = 0;
     joker->value = g_joker_types[joker->type].value;
+    joker->edition_t0 = 0.0f;
     game_init_draw_object(&(joker->draw));
     switch(joker->type)
     {
@@ -1522,6 +1523,10 @@ void game_init_full_deck()
             g_game_state.all_cards.cards[card_count].enhancement = CARD_ENHANCEMENT_NONE; // rand() % CARD_ENHANCEMENT_COUNT;
             g_game_state.all_cards.cards[card_count].edition =  CARD_EDITION_BASE;
             g_game_state.all_cards.cards[card_count].seal = CARD_SEAL_NONE;
+            g_game_state.all_cards.cards[card_count].dissolve = -1.0f;
+            g_game_state.all_cards.cards[card_count].dissolving = false;
+            g_game_state.all_cards.cards[card_count].score_counter = 0.0f;
+            g_game_state.all_cards.cards[card_count].edition_t0 = 0.0f;
             game_init_draw_object(&(g_game_state.all_cards.cards[card_count].draw));
             g_game_state.full_deck.cards[card_count] = &(g_game_state.all_cards.cards[card_count]);
             card_count++;
@@ -2109,7 +2114,12 @@ struct Card *game_set_new_card()
 {
     // TODO: Check if over the limit
     g_game_state.all_cards.card_count++;
-    return &g_game_state.all_cards.cards[g_game_state.all_cards.card_count-1];
+    struct Card *c = &g_game_state.all_cards.cards[g_game_state.all_cards.card_count-1];
+    c->dissolve = -1.0f;
+    c->score_counter = 0.0f;
+    c->edition_t0 = 0.0f;
+    c->dissolving = false;
+    return c;
 }
 
 void game_add_card_to_full_deck(struct Card *card)
@@ -2278,7 +2288,7 @@ void game_update()
     if (g_game_state.stage == GAME_STAGE_MENU)
     {
         game_input_update(false);
-        g_game_counter++;
+    g_game_counter++;
         return;
     }
 
@@ -2288,6 +2298,8 @@ void game_update()
     game_input_update(no_input);
 
     if (!no_input) g_freeze_cards = false;
+
+    gfx_effect_update_flash(1.0f / 60.0f);
 
     g_game_counter++;
 }

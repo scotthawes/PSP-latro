@@ -15,12 +15,20 @@ static void audio_open_log_file(void)
     }
 
     const char *paths[] = {
+        "ms0:/PSP/GAME/PSPALATRO/logs/audio.log",
         "ms0:/PSP/GAME/PSPALATRO/audio_debug.log",
+        "ms0:/PSP/logs/audio.log",
         "ms0:/PSP/audio_debug.log",
+        "logs/audio.log",
         "audio_debug.log"
     };
 
     for (int i = 0; i < 3; i++)
+    {
+        sceIoMkdir(paths[i], 0777);
+    }
+
+    for (int i = 0; i < 6; i++)
     {
         g_audio_log_fd = sceIoOpen(paths[i], PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
         if (g_audio_log_fd >= 0)
@@ -127,14 +135,15 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
 {    
     static int callback_count = 0;
     static int underrun_count = 0;
+    static int ok_count = 0;
     const unsigned int bytes_per_frame = 4; /* 16-bit stereo */
     unsigned int bytes_requested = length * bytes_per_frame;
     callback_count++;
     
     if (callback_count % 300 == 0)
     {
-        DEBUG_PRINTF("[AUDIO] callback #%d: ogg_id=%d, written=%d/%d, underruns=%d, read_pos=%d, write_pos=%d\n",
-                     callback_count, g_audio_buffer.ogg_id, g_audio_buffer.written, 
+        DEBUG_PRINTF("[AUDIO] cb#%d ogg_id=%d written=%d/%d underruns=%d read=%d write=%d\n",
+                     callback_count, g_audio_buffer.ogg_id, g_audio_buffer.written,
                      AUDIO_BUFFER_CHUNKS, underrun_count, g_audio_buffer.read_pos, g_audio_buffer.write_pos);
     }
     
@@ -171,9 +180,22 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
                 g_debug_info.audio_wait_read++;
                 underrun_count++;
                 memset(out, 0, remaining);
+                audio_unlock(intr);
+                DEBUG_PRINTF("[AUDIO] UNDERRUN #%d at cb#%d remaining=%u written=%d/%d ogg_id=%d\n",
+                             underrun_count, callback_count, remaining,
+                             g_audio_buffer.written, AUDIO_BUFFER_CHUNKS, g_audio_buffer.ogg_id);
+                ok_count = 0;
             }
-
-            audio_unlock(intr);
+            else
+            {
+                audio_unlock(intr);
+                ok_count++;
+                if (ok_count == 1 || ok_count % 600 == 0)
+                {
+                    DEBUG_PRINTF("[AUDIO] fill_ok cb#%d written=%d/%d ok_run=%d\n",
+                                 callback_count, g_audio_buffer.written, AUDIO_BUFFER_CHUNKS, ok_count);
+                }
+            }
         }
         else
         {
@@ -181,12 +203,11 @@ void audio_callback(void* buf, unsigned int length, void *userdata)
 
             g_debug_info.audio_wait_read++;
             underrun_count++;
-            if (underrun_count % 100 == 0)
-            {
-                DEBUG_PRINTF("[AUDIO] UNDERRUN #%d at callback #%d!\n", underrun_count, callback_count);
-            }
+            DEBUG_PRINTF("[AUDIO] UNDERRUN #%d at cb#%d! buffer_empty ogg_id=%d written=0/%d\n",
+                         underrun_count, callback_count, g_audio_buffer.ogg_id, AUDIO_BUFFER_CHUNKS);
             /* Audio underrun: zero-fill buffer to prevent garbage samples */
             memset(buf, 0, bytes_requested);
+            ok_count = 0;
         }
     }
     else

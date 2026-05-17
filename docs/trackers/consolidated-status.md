@@ -50,8 +50,8 @@ These features are present in the original Balatro v0.11 but not implemented or 
 
 4) Performance & UX improvements (medium priority)
 ------------------------------------------------
-- Replace full dcache flushes (`sceKernelDcacheWritebackInvalidateAll`) in hot-path draw macros with `sceKernelDcacheWritebackRange()` targeted writes.
-- Increase `MAX_QUADS` (e.g., → 500) to reduce flush frequency and lower draw call count.
+- Replace full dcache flushes (`sceKernelDcacheWritebackInvalidateAll`) in hot-path draw macros with `sceKernelDcacheWritebackRange()` targeted writes. Only `draw.c:442` (`game_init_draw()`, one-time init path) still uses `InvalidateAll`; all asset-load and per-frame texture writes already pass exact buffer pointer + byte count to `WritebackRange`.
+- Advisory: consider increasing `QUAD_ARRAY_CAPACITY` (currently 2000, ≈128 KB vertex pool) to ≥4000 (≤256 KB). Current `QUAD_FLUSH_THRESHOLD = 500` means mid-scene adverse overflow flushes are already avoided for small/medium scenes; the pool increase is needed only for 15+ simultaneous-card scenes with ATC/background overlays.
 - Consider moving OGG decode to a dedicated low-priority kernel thread to decouple audio decode from the main loop.
 - Default `settings.ini` quick wins: `overclock=true` (PSP-3000) and `speed=2` for snappier animations.
 - UI polish: format large numbers with thousands separators, use `font_big` for key HUD text, map analog stick to navigation.
@@ -298,3 +298,121 @@ Next action:
 - Begin next feature iteration or gameplay integration.
 
 This file is the canonical snapshot of the repository state as of this commit. For prior historical versions, consult the git history of the removed files listed above.
+
+---
+
+# Shader / Effects Implementation Status
+
+**Audit date:** 2026-05-17 | **Branch:** `feature/shader-implementation` (base: `master` @ `730120b`)
+**Source of truth:** `src/graphics_effects.h`, `src/graphics_effects.c`, `src/graphics.c`, `src/draw.c`, `src/game.c`, `src/global.h`
+**Checklist:** `docs/checklists/shader-implementation-checklist.md`
+
+## Implementation summary
+
+| Check | Status | Location / Notes |
+|-------|--------|-----------------|
+| `GFX_EFFECT_*` enum (12 entries) | ✅ | `graphics_effects.h:10-26` |
+| `GfxEffectParams` struct | ✅ | `graphics_effects.h:32-55` — mirrors Love2D uniforms |
+| Per-effect GPU helpers (9 of 12) | ✅ | `graphics_effects.c` — `gfx_apply_flash/background/foil/holographic/negative/polychrome/played/gold_seal/voucher` (lines 122–576) |
+| `graphics_effect_apply()` dispatcher | ✅ | `graphics_effects.c:640` — handles 12 `GfxEffect` cases |
+| `gfx_dissolve_mask_alpha()` utility | ✅ | `graphics_effects.c:58` — 3-osc field, 3×3 neighbourhood average |
+| `graphics_apply_texture_effect()` | ✅ | `graphics.c:1635` — unswizzle → `graphics_effect_apply()` → re-swizzle → dcache writeback-invalidate |
+| `graphics_apply_edition_effect_inplace()` | ✅ | `graphics_effects.c:108` — wraps edition-params build + dispatch for one-shot load-time use |
+| `graphics_set_texture_edition()` | ✅ | `graphics.c:1679` — stores edition/seal slots on `Texture` struct |
+| `FlashState` struct declared | ✅ | `global.h:51-55` — `{ bool active; float remaining_s; }`; lifecycle fully wired: `gfx_apply_flash()` pixel-worker, `gfx_effect_trigger_flash()` public API, and flash-overlay full-quad pass at `draw.c:2792–2817` |
+| Per-frame clock `g_time` | ✅ | `draw.c:337, 2409` — `int32_t g_time` incremented once per `game_draw()` call |
+| Per-frame clock `g_game_counter` | ✅ | `game.c:2274, 2281, 2292` — production clock, incremented in two places |
+| Background UV spin / `background.fs` equivalent | ✅ | `graphics_effects.c:156` — pixel-size grid, UV spin, 3-color paint model, contrast modulation |
+
+## Known blockers (call-site wiring gaps)
+
+### B-1 — ~~`graphics_apply_texture_effect()` has no production call-site~~ ✅ RESOLVED
+
+`graphics_apply_texture_effect()` exists at `graphics.c:1676` but the **per-frame animated card-effect pipeline** uses the pixel-buffer path via `game_draw_card_edition_effect()` instead (the texture-in-place API optimises load-time one-shot use and is not appropriate for per-frame animation).
+
+**Production call-site:** `draw.c:1048–1056` inside `game_draw_card()`.
+```c
+    if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE)
+    {
+        if (card->edition_t0 <= 0.0f)
+            card->edition_t0 = (float)g_time / 60.0f;
+        float elapsed = (float)g_time / 60.0f - card->edition_t0;
+        game_draw_card_edition_effect(card, elapsed, x, y, w, h, card_filter);
+    }
+```
+
+Wire chain:
+1. `game_draw_card()` — called for every on-screen card every frame (hand, played-hand, shop, booster, etc.)
+2. `game_draw_card_edition_effect()` — composites base+enhancer+seal into scratch, builds `GfxEffectParams` with non-zero `elapsed_s`, calls `graphics_effect_apply()` in-place on scratch
+3. `graphics_build_edition_params_realtime(edition, card_seed, elapsed_s)` — populates `GfxEffectParams.time`
+4. `graphics_effect_apply(pixels, w, h, &params)` — dispatches to per-edition worker (holographic, polychrome, foil, …)
+
+Call-site added in commit `cc686b5`; verified in `draw.c:1048–1056`.
+
+### B-2 — ~~`game_draw_card()` draws `tex_editions` statically; no effect routing~~ ✅ RESOLVED
+
+The `tex_editions` static-overlay draw call that existed before the per-frame shader pipeline is fully replaced. **Current routing in `game_draw_card()` at commit `fca004b`:**
+
+```c
+/* draw.c:1106 — replaces the old static-tile draw */
+if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE)
+{
+    if (card->edition_t0 <= 0.0f)
+        card->edition_t0 = (float)g_time / 60.0f;
+    float elapsed = (float)g_time / 60.0f - card->edition_t0;
+    game_draw_card_edition_effect(card, elapsed, x, y, w, h, card_filter);  // scratch → gfx_effect_apply() → temp texture → quad
+}
+```
+
+`g_editions_tex_coords[edition]` is now used exclusively as the **tile-UV offset** into the temp RGBA8 texture uploaded each frame — it is no longer called with `graphics_set_texture(tex_editions, ...)`. Holographic shimmer, polychrome frame-stepping, and foil/polychrome per-frame animations are all driven by the `GfxEffectParams.time` / `graphics_build_edition_params_realtime()` path.
+
+An identical replacement exists for jokers: `game_draw_joker_edition_effect()` at `draw.c:1139` replaces the mirror of the old static draw that was in `game_draw_joker()`.
+
+### B-3 — ~~`g_flash_state` declared but never exercised~~ ✅ RESOLVED
+
+`FlashState g_flash_state`, `gfx_effect_trigger_flash()` and `gfx_effect_update_flash()` were implemented in `graphics_effects.c` (commit `cc686b5`) but had no render-loop draw pass.
+
+**Fixed in `draw.c:2792–2817`** (`game_draw()` before `graphics_end_draw()`): the flash overlay copies the frame buffer (`flash_scratch[480×272↗RGBA]`), runs `gfx_apply_flash()` against it, then uploads to a temp texture and draws a full-screen overlay quad. The gameplay call-sites that call `gfx_effect_trigger_flash()` — e.g. `scratch_card_won()` / `scratch_card_lost()` in `game_input.c` — produce the visible white flash as intended.
+
+### B-4 — ~~`dissolve.fs` not integrated at texture level~~ ✅ PRODUCTION PIPELINE WIRED
+
+`gfx_dissolve_mask_alpha()` (`graphics_effects.c`) was fully implemented but had no game-loop caller.
+
+**Wired in `draw.c:1063–1103`** inside `game_draw_card()`: when `card->dissolving && card->dissolve >= 0.0f`, the pipeline composites the card base + enhancer layers into the scratch buffer, calls `graphics_effect_apply()` with `GFX_EFFECT_DISSOLVE`, and uploads the result to a temp texture. The dissolve threshold is driven by `card->dissolve` (the per-card dissolve float populated by gameplay events). CPU noise-field cost: ~9 evaluations/pixel (3-oscillator field, 3×3 neighbourhood average) — no LUT fallback yet.
+
+### B-5 — ~~Polychrome animation unverified / no palette cycle counter~~ ✅ RESOLVED
+
+`GFX_EFFECT_POLYCHROME` now carries a `polychrome_cycle` field in `GfxEffectParams` (set to `(int)(game_time / POLYCHROME_FRAME_S) % 40`, stepping every 0.667 s). The `res` palette term in `gfx_apply_polychrome()` is `0.5f + 0.5f * cosf(polychrome_param_r * 2.612f + (float)polychrome_cycle)` — a discrete integer cos argument cycling 0 → 39 rad over 40 frames. Commit `73c2e0d`.
+
+### B-6 — ~~No sin/cos LUT~~ LUT added; remaining candidates documented
+
+A shared linear-interpolation cosine/sine lookup table (`src/trig_lut.c`) was
+added. `TRIG_LUT_SIZE` defaults to 512 entries over `[0, 2π)`; `trig_cos_lut()`
+normalises the argument with `fmodf` + `fabsf` and linearly interpolates between
+adjacent buckets.  The table is lazily built on first call, occupying
+2048 bytes in BSS.
+
+Applied:
+- **polychrome.c**: `cosf(po_r * 2.612f + cycle_t)` → `trig_cos_lut(po_r * 2.612f + cycle_t)`; now zero stdlib trig calls in the per-pixel loop.
+- **dissolve.c**: 6 time-dependent `sinf`/`cosf` terms moved to a precomputed block
+  before the 3×3 noise loop (saving 54 calls per pixel for the first frame).
+  Per-pixel spatial terms also use `trig_cos_lut` / `trig_sin_lut` (5 additional
+  LUT calls replace 5 stdlib trig calls).
+
+Remaining per-pixel stdlib `sqrtf` costs in dissolve (9 calls/pixel) and foil/ref/
+background shaders are not part of B-6 and are tracked separately.
+
+### B-7 — `docs/CONSOLIDATED_STATUS.md` has no shader section (now fixed)
+
+**Resolved** — this document now includes §Shaders/Effects Implementation Status.
+
+## On checklist items [`[-]` deferred]
+
+| Item | Reason deferred | Recommended action |
+|------|----------------|-------------------|
+| `flame.fs` | Sprite-replacement not started; scene-planting would be frame-rate churned | Track as separate sprite-animation task |
+| PPSSPP artefact testing | Verified visually in emulation pass but no written bug-track record | Record a formal PPSSPP smoke-test pass |
+
+## On checklist items noting no persistent scratch/ping-pong buffer (item 3)
+
+A module-scope `gfx_scratch_buf` matching `MAX_CARD_TEXTURE_SIZE` was not pre-allocated. The port instead mallocs a working buffer inside `graphics_apply_texture_effect()` and frees it after every call. This is correct and avoids double-buffering overhead but allocates/frees a `< 512×512` allocation each time a card with a dynamic effect enters the screen. If profiling shows allocation jitter, a persistent free-list pool of 2–3 scratch buffers should be introduced.

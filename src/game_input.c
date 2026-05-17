@@ -755,6 +755,7 @@ void game_input_update_hand_play(bool no_input)
         if (g_game_state.selected_cards_count > 0 && g_game_state.current_hands > 0)
         {
             g_game_state.highlighted_item = 0;
+            gfx_effect_trigger_flash(12.0f);
             automated_event_set(AUTOMATED_EVENT_SCORE, 0);
             g_game_state.current_hands--;
         }
