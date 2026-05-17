@@ -37,6 +37,8 @@ struct Texture
     uint8_t *data;
     int format;
     int bytes_per_pixel;
+    int8_t edition;       /* GFX_EFFECT_* — non-negative = effect active */
+    int8_t seal;          /* which seal overlay this card needs */
 };
 
 struct Font
@@ -1590,4 +1592,72 @@ bool graphics_get_texture_content_size(int texture, int *out_width, int *out_hei
     }
 
     return true;
+}
+
+/* ---------------------------------------------------------------- */
+/*  Edition / seal effect application on loaded textures             */
+/* ---------------------------------------------------------------- */
+
+#include "graphics_effects.h"
+
+int graphics_apply_texture_effect(int texture_index, const GfxEffectParams *params)
+{
+    if (texture_index < 0 || texture_index >= MAX_TEXTURES || !g_textures[texture_index].in_use)
+        return -1;
+    if (params == NULL) return -1;
+
+    struct Texture *tex = &g_textures[texture_index];
+    if (tex->data == NULL) return -1;
+
+    /* Skip GFX_EFFECT_NONE and invalid effects */
+    if (params->effect == GFX_EFFECT_NONE) return 0;
+
+    int w = tex->content_width;
+    int h = tex->content_height;
+    if (w <= 0 || h <= 0) return -1;
+
+    int bpp = tex->bytes_per_pixel;
+    int stride = w * bpp;
+
+    /* Allocate unswizzled working buffer at maximum possible alignment */
+    uint8_t *pixels = (uint8_t *)malloc(stride * h);
+    if (pixels == NULL) return -1;
+
+    /* Unswizzle from GPU-friendly layout into sequential RGBA data */
+    swizzle_fast(pixels, tex->data, stride, h);
+
+    /* Apply the effect in-place on the unswizzled RGBA8 buffer */
+    int ret = graphics_effect_apply(pixels, w, h, params);
+    if (ret < 0)
+    {
+        free(pixels);
+        return -1;
+    }
+
+    /* Re-swizzle the processed pixels back into GPU storage */
+    swizzle_fast(tex->data, pixels, stride, h);
+    sceKernelDcacheWritebackInvalidateRange(tex->data, stride * h);
+
+    free(pixels);
+    DEBUG_PRINTF("[TEX] Applied effect %d to texture %d (%dx%d)\n",
+                 params->effect, texture_index, w, h);
+    return 0;
+}
+
+void graphics_set_texture_edition(int texture_index, int8_t edition, float card_seed)
+{
+    if (texture_index < 0 || texture_index >= MAX_TEXTURES) return;
+    g_textures[texture_index].edition = (int8_t)edition;
+    g_textures[texture_index].seal    = CARD_SEAL_NONE;
+    if (edition >= 0)
+    {
+        DEBUG_PRINTF("[TEX] texture %d: edition=%d seed=%.4f\n",
+                     texture_index, edition, card_seed);
+    }
+}
+
+void graphics_set_texture_seal(int texture_index, int8_t seal)
+{
+    if (texture_index < 0 || texture_index >= MAX_TEXTURES) return;
+    g_textures[texture_index].seal = (int8_t)seal;
 }

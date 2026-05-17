@@ -1118,6 +1118,16 @@ void graphics_set_offscreen_render_target();
 void graphics_unset_offscreen_render_target();
 void graphics_flush_quads();
 
+/**
+ * High-level effect helpers (graphics_effects.c) — declared here to avoid
+ * including the whole header file and to keep global.h as the central header.
+ */
+int  graphics_apply_edition_effect_inplace(uint8_t *pixels, int width, int height,
+                                           int edition, float card_seed, float time);
+int  graphics_apply_texture_effect(int texture_index, const GfxEffectParams *params);
+void graphics_set_texture_edition(int texture_index, int8_t edition, float card_seed);
+void graphics_set_texture_seal(int texture_index, int8_t seal);
+
 #define INPUT_BUTTON_LEFT           PSP_CTRL_LEFT
 #define INPUT_BUTTON_RIGHT          PSP_CTRL_RIGHT
 #define INPUT_BUTTON_UP             PSP_CTRL_UP
