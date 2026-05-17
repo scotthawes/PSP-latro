@@ -50,8 +50,8 @@ These features are present in the original Balatro v0.11 but not implemented or 
 
 4) Performance & UX improvements (medium priority)
 ------------------------------------------------
-- Replace full dcache flushes (`sceKernelDcacheWritebackInvalidateAll`) in hot-path draw macros with `sceKernelDcacheWritebackRange()` targeted writes.
-- Increase `MAX_QUADS` (e.g., → 500) to reduce flush frequency and lower draw call count.
+- Replace full dcache flushes (`sceKernelDcacheWritebackInvalidateAll`) in hot-path draw macros with `sceKernelDcacheWritebackRange()` targeted writes. Only `draw.c:442` (`game_init_draw()`, one-time init path) still uses `InvalidateAll`; all asset-load and per-frame texture writes already pass exact buffer pointer + byte count to `WritebackRange`.
+- Advisory: consider increasing `QUAD_ARRAY_CAPACITY` (currently 2000, ≈128 KB vertex pool) to ≥4000 (≤256 KB). Current `QUAD_FLUSH_THRESHOLD = 500` means mid-scene adverse overflow flushes are already avoided for small/medium scenes; the pool increase is needed only for 15+ simultaneous-card scenes with ATC/background overlays.
 - Consider moving OGG decode to a dedicated low-priority kernel thread to decouple audio decode from the main loop.
 - Default `settings.ini` quick wins: `overclock=true` (PSP-3000) and `speed=2` for snappier animations.
 - UI polish: format large numbers with thousands separators, use `font_big` for key HUD text, map analog stick to navigation.
@@ -384,9 +384,23 @@ An identical replacement exists for jokers: `game_draw_joker_edition_effect()` a
 
 `GFX_EFFECT_POLYCHROME` now carries a `polychrome_cycle` field in `GfxEffectParams` (set to `(int)(game_time / POLYCHROME_FRAME_S) % 40`, stepping every 0.667 s). The `res` palette term in `gfx_apply_polychrome()` is `0.5f + 0.5f * cosf(polychrome_param_r * 2.612f + (float)polychrome_cycle)` — a discrete integer cos argument cycling 0 → 39 rad over 40 frames. Commit `73c2e0d`.
 
-### B-6 — ~~No sin/cos LUT~~ Partial (B-5 palette fix reduced LUT urgency)
+### B-6 — ~~No sin/cos LUT~~ LUT added; remaining candidates documented
 
-The B-5 fix removed the dead field/noise computation (~15 trig calls/pixel/frame), so `gfx_apply_polychrome()` now does exactly one `cosf` call per pixel. The dissolve path (`gfx_dissolve_mask_alpha`) still evaluates 9 noise positions per pixel; a sin/cos LUT is a candidate optimization but no profiling has shown it is a bottleneck on PSP hardware yet.
+A shared linear-interpolation cosine/sine lookup table (`src/trig_lut.c`) was
+added. `TRIG_LUT_SIZE` defaults to 512 entries over `[0, 2π)`; `trig_cos_lut()`
+normalises the argument with `fmodf` + `fabsf` and linearly interpolates between
+adjacent buckets.  The table is lazily built on first call, occupying
+2048 bytes in BSS.
+
+Applied:
+- **polychrome.c**: `cosf(po_r * 2.612f + cycle_t)` → `trig_cos_lut(po_r * 2.612f + cycle_t)`; now zero stdlib trig calls in the per-pixel loop.
+- **dissolve.c**: 6 time-dependent `sinf`/`cosf` terms moved to a precomputed block
+  before the 3×3 noise loop (saving 54 calls per pixel for the first frame).
+  Per-pixel spatial terms also use `trig_cos_lut` / `trig_sin_lut` (5 additional
+  LUT calls replace 5 stdlib trig calls).
+
+Remaining per-pixel stdlib `sqrtf` costs in dissolve (9 calls/pixel) and foil/ref/
+background shaders are not part of B-6 and are tracked separately.
 
 ### B-7 — `docs/CONSOLIDATED_STATUS.md` has no shader section (now fixed)
 

@@ -4,6 +4,7 @@
  *   third_party/balatro-v011-reference/game_love_extracted/resources/shaders/polychrome.fs
  */
 #include "../graphics_effects.h"
+#include "../trig_lut.h"
 #include <math.h>
 
 static int gfx_apply_polychrome(uint8_t *pixels, int w, int h, const GfxEffectParams *p)
@@ -38,7 +39,7 @@ static int gfx_apply_polychrome(uint8_t *pixels, int w, int h, const GfxEffectPa
              * offset is quantised to match the Balatro 40-frame colour cycle. */
             float cycle_t = (float)p->polychrome_cycle;
 
-            float res = 0.5f + 0.5f * cosf(po_r * 2.612f + cycle_t);
+            float res = 0.5f + 0.5f * trig_cos_lut(po_r * 2.612f + cycle_t);
             H += res + po_g * 0.04f;
             S = MIN(0.6f, S + 0.5f);
 
