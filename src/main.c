@@ -27,11 +27,14 @@ static int g_audio_deferred_frame_count = 0;
 
 #define FORCE_PRESENTATION_TEST 0
 
-static void boot_log(const char *message)
+void boot_log(const char *message)
 {
+    char logbuf[512];
+    snprintf(logbuf, sizeof(logbuf), "boot_log: %s\n", message);
+    
+    // Try writing to PPSSPP memstick first
     const char *paths[] = {
         "ms0:/PSP/GAME/PSPALATRO/pspalatro_boot.log",
-        "ms0:/PSP/GAME/PSPALATRO/./pspalatro_boot.log",
         "/PSP/GAME/PSPALATRO/pspalatro_boot.log",
         "pspalatro_boot.log"
     };
@@ -42,6 +45,7 @@ static void boot_log(const char *message)
         if (f)
         {
             fprintf(f, "%s\n", message);
+            fflush(f);
             fclose(f);
             break;
         }

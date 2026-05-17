@@ -69,7 +69,7 @@ static int s_title_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 }
 static int s_main_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
 static int s_title_logo_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
 
-#define MENU_TITLE_BACKGROUND_PATH "backgrounds/balatro_bg_alt.png"
+#define MENU_TITLE_BACKGROUND_PATH "balatro-ui-optimized/balatro_bg_alt.png"
 #define MENU_TITLE_LOGO_PATH "balatro-ui-optimized/logo_text_psp.png" // logo text only, no ace
 #define MENU_TITLE_ACE_CARD_PATH "balatro-ui-optimized/ace_spades_psp.png" // ace card only
 #define MENU_TITLE_LOGO_FALLBACK_PATH "balatro-ui-optimized/logo_alt_psp.png"
@@ -327,20 +327,19 @@ static struct MenuButtonStyle menu_get_button_style(int kind, bool selected)
 static void menu_draw_button_widget(float x, float y, float w, float h, int texture_id, const struct MenuButtonStyle *style)
 {
     // Subtle drop edge keeps buttons readable over noisy backgrounds.
-    menu_draw_rect(x, y + 1.0f, w, h, 0x22000000);
-    menu_draw_rect(x, y, w, h, style->fill);
+    game_draw_pill(x, y + 1.0f, w, h, 0x22000000);
 
     // Gloss + depth passes to mimic Balatro's beveled chips.
-    menu_draw_rect(x + 1.0f, y + 1.0f, w - 2.0f, 1.0f, 0x26FFFFFF);
-    menu_draw_rect(x + 1.0f, y + h - 2.0f, w - 2.0f, 1.0f, 0x34000000);
+    game_draw_pill(x + 1.0f, y + 1.0f, w - 2.0f, 1.0f, 0x26FFFFFF);
+    game_draw_pill(x + 1.0f, y + h - 2.0f, w - 2.0f, 1.0f, 0x34000000);
 
     if (texture_id >= 0 && style->texture_tint != 0)
     {
         menu_draw_texture_fill(texture_id, x + 2.0f, y + 2.0f, w - 4.0f, h - 4.0f, style->texture_tint);
     }
 
-    menu_draw_rect_border(x + 1.0f, y + 1.0f, w - 2.0f, h - 2.0f, 0x1C000000, 1);
-    menu_draw_rect_border(x, y, w, h, style->border, style->border_px);
+    game_draw_pill(x, y, w, h, style->border);
+    game_draw_pill(x + 1.0f, y + 1.0f, w - 2.0f, h - 2.0f, style->fill);
 }
 
 static void menu_draw_button_label_centered(const char *label, float x, float y, float w, float h,
@@ -359,10 +358,10 @@ static void menu_draw_button_label_centered(const char *label, float x, float y,
 
 static void menu_draw_icon_chip(float x, float y, float size, uint32_t fill, uint32_t border, int texture_id)
 {
-    menu_draw_rect(x, y + 1.0f, size, size, 0x1E000000);
-    menu_draw_rect(x, y, size, size, fill);
-    menu_draw_rect(x + 1.0f, y + 1.0f, size - 2.0f, 1.0f, 0x26FFFFFF);
-    menu_draw_rect_border(x, y, size, size, border, 1);
+    game_draw_pill(x, y + 1.0f, size, size, 0x1E000000);
+    game_draw_pill(x, y, size, size, border);
+    game_draw_pill(x + 1.0f, y + 1.0f, size - 2.0f, size - 2.0f, fill);
+    game_draw_pill(x + 1.0f, y + 1.0f, size - 2.0f, 1.0f, 0x26FFFFFF);
 
     if (texture_id >= 0)
     {
@@ -486,7 +485,6 @@ static void menu_init_wallpapers()
 void menu_draw_wallpaper(int texture_id) {
     if (texture_id < 0)
     {
-        menu_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF0F0F0F);
         return;
     }
 
@@ -498,32 +496,12 @@ void menu_draw_wallpaper(int texture_id) {
         content_h = SCREEN_HEIGHT;
     }
 
-    // Scale-to-fill (cover): maintain aspect ratio and center-crop any excess so
-    // the image fills the screen without stretching or black bars.
-    float src_u = 0.0f, src_v = 0.0f;
-    float src_w = (float)content_w;
-    float src_h = (float)content_h;
-    float img_aspect = (float)content_w / (float)content_h;
-    float scr_aspect = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
-
-    if (img_aspect > scr_aspect)
-    {
-        // Image is wider than screen: fit height, center-crop width.
-        src_w = (float)content_h * scr_aspect;
-        src_u = ((float)content_w - src_w) * 0.5f;
-    }
-    else if (img_aspect < scr_aspect)
-    {
-        // Image is taller than screen: fit width, center-crop height.
-        src_h = (float)content_w / scr_aspect;
-        src_v = ((float)content_h - src_h) * 0.5f;
-    }
-
-    // Nearest keeps texel colours from being averaged by bilinear filtering.
-    graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_NEAREST);
-    graphics_draw_quad(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                       (int16_t)src_u, (int16_t)src_v,
-                       (int16_t)src_w, (int16_t)src_h,
+    // Wallpaper is now downsampled during load to fit within the 
+    // PSP's 512px sampler limit, ensuring the full image is visible.
+    graphics_set_texture(texture_id, GRAPHICS_TEXTURE_FILTER_LINEAR);
+    graphics_draw_quad(0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT,
+                       0, 0,
+                       (int16_t)content_w, (int16_t)content_h,
                        0xFFFFFFFF);
 }
 
@@ -596,8 +574,8 @@ static void menu_draw_title()
 
     if (!show_main_menu_chrome)
     {
-        menu_draw_rect(128.0f, 233.0f, 224.0f, 20.0f, 0x8C111111);
-        menu_draw_rect_border(128.0f, 233.0f, 224.0f, 20.0f, 0xFF3A3A3A, 1);
+        game_draw_pill(126.0f, 231.0f, 228.0f, 24.0f, 0xFF3A3A3A);
+        game_draw_pill(128.0f, 233.0f, 224.0f, 20.0f, 0x8C111111);
         graphics_draw_text_center(font_small, "PRESS X", SCREEN_WIDTH * 0.5f, 239.0f, 0.95f, 0xFFEFEFEF);
     }
     else
@@ -607,8 +585,8 @@ static void menu_draw_title()
         float bar_y = 230.0f;
         float bar_w = SCREEN_WIDTH - 144.0f;
         float bar_h = 27.0f;
-        menu_draw_rect(bar_x, bar_y, bar_w, bar_h, 0x9E171717);
-        menu_draw_rect_border(bar_x, bar_y, bar_w, bar_h, 0xFF3A3A3A, 1);
+        game_draw_pill(bar_x - 1.0f, bar_y - 1.0f, bar_w + 2.0f, bar_h + 2.0f, 0xFF3A3A3A);
+        game_draw_pill(bar_x, bar_y, bar_w, bar_h, 0x9E171717);
         menu_validate_rect("action_bar", bar_x, bar_y, bar_w, bar_h);
 
         float button_gap = 4.0f;
@@ -866,10 +844,16 @@ void menu_draw()
 // ----------------------------------------------------------------
 void menu_input_title(bool no_input)
 {
+    char logbuf[128];
     if (no_input) return;
 
+    snprintf(logbuf, sizeof(logbuf), "menu_input_title: cross=%d", 
+             input_was_button_pressed(INPUT_BUTTON_CROSS));
+    boot_log(logbuf);
+    
     if (input_was_button_pressed(INPUT_BUTTON_CROSS))
     {
+        boot_log("Cross pressed, transitioning to main menu");
         g_game_state.sub_stage = GAME_SUBSTAGE_MENU_MAIN;
         g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_MAIN;
         g_game_state.menu_selected_item = MENU_MAIN_ITEM_NEW_RUN;

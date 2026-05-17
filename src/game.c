@@ -866,12 +866,15 @@ static void game_get_hand_card_layout(int index, int count, bool selected, float
     float normalized = from_center / center;
     float abs_normalized = fabsf(normalized);
 
-    float density = ((float)count - 1.0f) / 7.0f;
+    float density = ((float)count - 1.0f) / (UI_LAYOUT_MAX_HAND_CARDS - 1.0f);
     if (density < 0.0f) density = 0.0f;
     if (density > 1.0f) density = 1.0f;
 
-    // Keep 8-card hands compact, but open up 5-card layouts for readability.
-    float spacing = 62.0f - density * 24.0f;
+    // Derive spacing from container width so hand resizes cleanly with layout changes.
+    float available = DRAW_HAND_WIDTH - CARD_WIDTH;
+    float spacing = available / ((float)count - 1.0f);
+    float min_spacing = CARD_WIDTH * 0.90f;
+    if (spacing < min_spacing) spacing = min_spacing;
     float hand_center_x = DRAW_HAND_X + (DRAW_HAND_WIDTH - CARD_WIDTH) / 2.0f;
 
     *x = hand_center_x + from_center * spacing;
@@ -1064,7 +1067,7 @@ void game_set_shop_item_position()
                 }
             }
             game_init_draw_object(draw);
-            draw->initial_x = draw->final_x = draw->x = DRAW_SHOP_SINGLE_X - (CARD_WIDTH / 2.0f) + (i + 1) * DRAW_SHOP_SINGLE_WIDTH / ((float)g_game_state.shop.total_items + 1.0f);
+            draw->initial_x = draw->final_x = draw->x = game_util_get_item_position(i, g_game_state.shop.total_items, DRAW_SHOP_SINGLE_X, DRAW_SHOP_SINGLE_WIDTH, CARD_WIDTH);
             draw->initial_y = draw->final_y = draw->y = DRAW_SHOP_SINGLE_Y;
         }
     }
@@ -1078,7 +1081,7 @@ void game_set_shop_booster_position()
         {
             struct DrawObject *draw = &(g_game_state.shop.boosters[i].booster.draw);
             game_init_draw_object(draw);
-            draw->initial_x = draw->final_x = draw->x = DRAW_SHOP_BOOSTER_X - (BOOSTER_WIDTH / 2.0f) + (i + 1) * DRAW_SHOP_BOOSTER_WIDTH / ((float)g_game_state.shop.total_boosters + 1.0f);
+            draw->initial_x = draw->final_x = draw->x = game_util_get_item_position(i, g_game_state.shop.total_boosters, DRAW_SHOP_BOOSTER_X, DRAW_SHOP_BOOSTER_WIDTH, BOOSTER_WIDTH);
             draw->initial_y = draw->final_y = draw->y = DRAW_SHOP_BOOSTER_Y;
         }
     }
@@ -2288,4 +2291,3 @@ void game_update()
 
     g_game_counter++;
 }
-

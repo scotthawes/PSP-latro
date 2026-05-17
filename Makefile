@@ -22,8 +22,8 @@ LDFLAGS =
 
 EXTRA_TARGETS = EBOOT.PBP
 PSP_EBOOT_TITLE = PSPalatro
-PSP_EBOOT_ICON = media/pspalatro_icon.png
-PSP_EBOOT_PIC1 = media/pspalatro_pic.png
+PSP_EBOOT_ICON = media/third-party/game_icon-0.png
+PSP_EBOOT_PIC1 = media/third-party/image-1.png
 
 # Unity-build dependency: main.c includes many src/*.c and src/*.h files.
 # Rebuild main.o when any included source/header changes.
