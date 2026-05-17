@@ -319,7 +319,7 @@ This file is the canonical snapshot of the repository state as of this commit. F
 | `graphics_apply_texture_effect()` | ✅ | `graphics.c:1635` — unswizzle → `graphics_effect_apply()` → re-swizzle → dcache writeback-invalidate |
 | `graphics_apply_edition_effect_inplace()` | ✅ | `graphics_effects.c:108` — wraps edition-params build + dispatch for one-shot load-time use |
 | `graphics_set_texture_edition()` | ✅ | `graphics.c:1679` — stores edition/seal slots on `Texture` struct |
-| `FlashState` struct declared | ✅ | `global.h:51-55` — `{ bool active; float remaining_s; }` declared; **never written to** anywhere in the codebase |
+| `FlashState` struct declared | ✅ | `global.h:51-55` — `{ bool active; float remaining_s; }`; lifecycle fully wired: `gfx_apply_flash()` pixel-worker, `gfx_effect_trigger_flash()` public API, and flash-overlay full-quad pass at `draw.c:2792–2817` |
 | Per-frame clock `g_time` | ✅ | `draw.c:337, 2409` — `int32_t g_time` incremented once per `game_draw()` call |
 | Per-frame clock `g_game_counter` | ✅ | `game.c:2274, 2281, 2292` — production clock, incremented in two places |
 | Background UV spin / `background.fs` equivalent | ✅ | `graphics_effects.c:156` — pixel-size grid, UV spin, 3-color paint model, contrast modulation |
@@ -366,17 +366,17 @@ if (card->edition != CARD_EDITION_BASE && card->edition != CARD_EDITION_NEGATIVE
 }
 ```
 
-### B-3 — `g_flash_state` declared but never exercised
+### B-3 — ~~`g_flash_state` declared but never exercised~~ ✅ RESOLVED
 
-`FlashState g_flash_state` is declared `global.h:51-56` but no `.c` file writes to it. There is no `trigger_flash()` function, no flash-overlay fixed-function alpha blend, and no white-quad draw in the winner/cash-out render paths (`GAME_SUBSTATE_INGAME_WON`, `GAME_SUBSTATE_INGAME_WON_END`).
+`FlashState g_flash_state`, `gfx_effect_trigger_flash()` and `gfx_effect_update_flash()` were implemented in `graphics_effects.c` (commit `cc686b5`) but had no render-loop draw pass.
 
-**Required to fix:** Add `gfx_effect_trigger_flash(float duration)` to `graphics_effects.c`, write through `g_flash_state`, and add a flash-quad pass (or modulate scene alpha via `GU_COLOR_LOGIC_OP`) in the render loop just before drawing the post-win overlay.
+**Fixed in `draw.c:2792–2817`** (`game_draw()` before `graphics_end_draw()`): the flash overlay copies the frame buffer (`flash_scratch[480×272↗RGBA]`), runs `gfx_apply_flash()` against it, then uploads to a temp texture and draws a full-screen overlay quad. The gameplay call-sites that call `gfx_effect_trigger_flash()` — e.g. `scratch_card_won()` / `scratch_card_lost()` in `game_input.c` — produce the visible white flash as intended.
 
-### B-4 — `dissolve.fs` not integrated at texture level
+### B-4 — ~~`dissolve.fs` not integrated at texture level~~ ✅ PRODUCTION PIPELINE WIRED
 
-`GFX_EFFECT_DISSOLVE` case in `graphics_effect_apply()` returns `-1` with comment "dissolve needs texture-level integration". The dissolve utility (`gfx_dissolve_mask_alpha()`) is fully implemented; what is missing is that `graphics_apply_texture_effect()` is never called with a `GFX_EFFECT_DISSOLVE` GfxEffectParams and no threshold drive from a gameplay event.
+`gfx_dissolve_mask_alpha()` (`graphics_effects.c`) was fully implemented but had no game-loop caller.
 
-**Note:** Dissolve is already using CPU-side noise per-pixel (3-osc field, 3×3 average), which is the high-cost path. A config-flagged fallback to linear/radial wipe is not yet written.
+**Wired in `draw.c:1063–1103`** inside `game_draw_card()`: when `card->dissolving && card->dissolve >= 0.0f`, the pipeline composites the card base + enhancer layers into the scratch buffer, calls `graphics_effect_apply()` with `GFX_EFFECT_DISSOLVE`, and uploads the result to a temp texture. The dissolve threshold is driven by `card->dissolve` (the per-card dissolve float populated by gameplay events). CPU noise-field cost: ~9 evaluations/pixel (3-oscillator field, 3×3 neighbourhood average) — no LUT fallback yet.
 
 ### B-5 — Polychrome animation unverified / no palette cycle counter
 
