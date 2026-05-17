@@ -98,25 +98,6 @@ static inline uint8_t gfx_dissolve_mask_alpha(
     return (res > adjusted_dissolve) ? (shadow ? (uint8_t)(pixel_alpha * 0.3f) : pixel_alpha) : 0;
 }
 
-/* Convert RGBA8 pixel array from src → dst applying dissolve mask        */
-static void gfx_apply_dissolve_mask(uint8_t *dst, const uint8_t *src,
-                                    int width, int height,
-                                    float dissolve, float time, bool shadow)
-{
-    for (int j = 0; j < height; j++)
-    {
-        for (int i = 0; i < width; i++)
-        {
-            int idx = (j * width + i) * 4;
-            float d = gfx_dissolve_mask_alpha(src[idx + 3], dissolve, i, j, width, height,
-                                              time + (float)(i + j * width) / (float)(width * height), shadow);
-            dst[idx]     = src[idx];
-            dst[idx + 1] = src[idx + 1];
-            dst[idx + 2] = src[idx + 2];
-            dst[idx + 3] = d;
-        }
-    }
-}
 
 /**
  * Apply an edition effect to @p pixels buffer in-place.
