@@ -35,9 +35,9 @@ Tracks the implementation of the Balatro reference shader port, adapted for the 
 
 ### flash.fs equivalent
 
-- [~] **6. `flash_state` struct** — `FlashState { bool active; float remaining_s; }` declared in `global.h:51-55`, extern `g_flash_state`. *(Struct exists but is **never written to** in any `.c` file — no production call-site.)*
-- [~] **7. `trigger_flash()` public API** — `gfx_apply_flash()` pixel worker exists at `graphics_effects.c:122`, but no `trigger_flash()` gameplay-facing function exists, and no winner/cash-out code activates it.
-- [ ] **8. Flash render-loop blit** — No white-quad pass, no fixed-function alpha blend, no flash-overlay draw in the winner/cash-out (`GAME_SUBSTAGE_INGAME_WON` / `INGAME_WON_END`) render paths.
+- [x] **6. `flash_state` struct** — `FlashState { bool active; float remaining_s; }` declared in `global.h:51-55`, extern `g_flash_state`, defined in `graphics_effects.c:8`. Fully written-to and managed by `gfx_effect_trigger_flash()` / `gfx_effect_update_flash()`.
+- [x] **7. `trigger_flash()` public API** — `gfx_effect_trigger_flash()` and `gfx_effect_update_flash()` are the gameplay-facing functions, implemented in `graphics_effects.c`. Activated from `game_input.c` (`scratch_card_won()` / `scratch_card_lost()`).
+- [x] **8. Flash render-loop blit** — Full draw call added at `draw.c:2792–2817` (`game_draw()` just before `graphics_end_draw()`): white-quad pass using a scratch buffer, `gfx_apply_flash()`, temp-texture upload, full-screen alpha-quad, flush, destroy.
 
 ### background.fs equivalent
 
