@@ -18,62 +18,45 @@
 - `graphics_effects.c` trimmed from ~680 to ~230 lines (math helpers, `GfxEffectParams` builders, `graphics_effect_apply()` dispatcher only); per-shader pixel bodies extracted to `src/shaders/`
 - `graphics_effects.c` now uses `#include "shaders/<name>.c"` to pull all shader files into the unity build
 - `Makefile` dependency wildcard extended to `src/shaders/*.c`
+-
+- **B-1 RESOLVED** — `graphics_apply_texture_effect()` has a production call-site: `draw.c:1048–1056` inside `game_draw_card()` via `game_draw_card_edition_effect()` → scratch-buffer → `graphics_effect_apply()` per-frame
+- **B-2 RESOLVED** — `game_draw_card()` no longer draws `tex_editions` statically; per-frame scratch-buffer pipeline (`game_draw_card_edition_effect()` / `game_draw_joker_edition_effect()`) fully replaces it
+- **B-3 RESOLVED** — `g_flash_state` lifecycle fully wired: `gfx_effect_trigger_flash()` / `gfx_effect_update_flash()` in `graphics_effects.c`; flash-overlay full-quad pass at `draw.c:2792–2817`; gameplay call-sites in `game_input.c`
+- **B-4 RESOLVED** — `GFX_EFFECT_DISSOLVE` production pipeline wired at `draw.c:1063–1103`: card base + enhancer composited into scratch, `graphics_effect_apply()` run, result uploaded to temp texture and drawn
+- **B-5 RESOLVED** — `polychrome_cycle` (`int`, 0–39) computed in `graphics_build_edition_params_realtime()` as `(int)(game_time / POLYCHROME_FRAME_S) % 40`; discrete 40-frame palette stepping replaces continuous field-only variation
+- **B-6 RESOLVED** — `src/trig_lut.c` adds a lazily-initialised 512-entry cosine LUT with linear interpolation over `[0, 2π)`; `trig_cos_lut()` / `trig_sin_lut()` used in `polychrome.c` (zero per-pixel stdlib trig) and `dissolve.c` (6 time-dependent terms precomputed once per frame; per-pixel spatial terms also use LUT). `trig_lut.c` included from `src/main.c`
+- **B-7 RESOLVED** — `docs/CONSOLIDATED_STATUS.md` now includes §Shader / Effects Implementation Status
 
-### In Progress
-- Call-site wiring gaps B-1 through B-7 remain open (dispatcher works end-to-end; nothing calls it yet)
+### Deferred / Out of Scope
+- `flame.fs` — formally deferred to separate sprite-animation task
+- `GFX_EFFECT_NEGATIVE_SHINE` — dispatcher stub (`return -1`); no Balatro reference resolved yet
+- Persistent `gfx_scratch_buf` ping-pool pool — per-call `malloc`/`free` currently used; monitor for allocation jitter on device
+- PPSSPP smoke-test written record — visually verified; formal bug-track pass pending
 
-### Blocked
-- `GFX_EFFECT_DISSOLVE` returns `-1` from dispatcher; `GFX_EFFECT_NEGATIVE_SHINE` likewise unhandled; both utility functions exist but have no gameplay trigger path
-- `g_flash_state` declared in `global.h:51-55` but never written to anywhere in the codebase; no `trigger_flash()` public API; no flash-overlay draw in winner/cash-out passes
-- `game_draw_card()` draws `tex_editions` statically (`draw.c:837`) — no call to `graphics_set_texture_edition()` or `graphics_apply_texture_effect()`, so animated effects (holographic, polychrome, negative/gold/voucher with time dep) cannot originate from the card-draw path
-- `gfx_scratch_buf` (module-scope ping-pong buffer) not introduced; per-call `malloc`/`free` inside `graphics_apply_texture_effect()` has allocation jitter risk on PSP if a heap test alloc blocks during frame
-- `libm sinf/cosf/sqrtf` called per-pixel across full 480×272 with no LUT; no profiling data on frame budget impact yet
-- Polychrome has no discrete 40-palette frame-step counter (continuous field variation instead of frame-stepped palette set)
-- No sin/cos LUT introduced in effects pipeline
-- `flame.fs` formally deferred to separate sprite-animation task
-- No PPSSPP artefact bug-track record written yet
+### Not Yet Profiled
+- Full-scene `graphics_apply_background()` at 480×272 CPU cost (per-pixel `sinf`/`cosf` still in `background.c`)
+- `hologram.c` / `foil.c` / `flash.c` still use libm trig in hot loops; LUT migration is candidate work if frame budget is pressured
 
 ## Key Decisions
 - Chose `src/shaders/` subdirectory over `assets/balatro-shaders/`: `assets/` is the image/audio asset tree; placing C source there conflicts with Makefile/Build conventions and unity-build discoverability
 - Chose one-file-per-shader grouping: `played.c` holds `played.fs` + `gold_seal.fs` + `voucher.fs`; all others individual
 - Math helpers (`gfx_hue`, `gfx_HSL_to_RGB`, `gfx_RGB_to_HSL`) and `gfx_dissolve_mask_alpha()` utility plus dispatcher retained in `graphics_effects.c`
-- `dissolve.fs` full body coped to `src/shaders/dissolve.c`; `graphics_effect_apply()` still stubs `GFX_EFFECT_DISSOLVE` with `-1` until `game_init_draw()` caller is wired
+- LUT uses lazy Initialisation (built on first call, occupying ~2 KB in BSS) rather than static init to avoid startup cost in init-only paths
+- `trig_lut.c` has no interdependency on `graphics_effects.c`; it is included from `main.c` before `graphics_effects.c` so shader files can `#include "../trig_lut.h"` without circular-declaration issues
 
-## Next Steps
-1. Wire B-1 / B-2: route `game_draw_card()` through `graphics_build_edition_params_realtime()` + `graphics_apply_texture_effect()` so holo/polychrome/negative/gold_seal/voucher time-params are seeded per-frame
-2. Wire B-3 / B-8: add `gfx_effect_trigger_flash(float duration)` API; write through `g_flash_state`; add flash-overlay pass (white quad or `GU_COLOR_LOGIC_OP`) in winner/cash-out render path
-3. Wire B-4 / B-18: `GFX_EFFECT_DISSOLVE` in `graphics_effect_apply()`; threshold drive from gameplay event; callback through `gfx_dissolve_mask_alpha()`
-4. Resolve B-5: add polychrome discrete frame counter — map `time` to palette index for frame-synced appearance vs Balatro reference
-5. Resolve B-6: evaluate sin/cos LUT for per-pixel hot paths; add `sin_lut[256]` and replace libm calls in `src/shaders/*.c` if profiling shows frame budget pressure
-6. Profile B-7: record PPSSPP fps-drop baseline for `gfx_apply_holographic()` at full 480×272
-7. Consider persistent `gfx_scratch_buf` pool if allocation jitter is measurable
-
-## Critical Context
-- `g_time` IS incremented once per `game_draw()` (`draw.c:337, 2409`) — earlier audit tagged it "dead variable" incorrectly; it is actually the `gfx_apply_background()` / `GfxEffectParams.time` carrier, although `g_game_counter` (game.c:2274) is the primary production clock
-- `gfx_effect_apply()` dispatcher in `graphics_effects.c` is end-to-end functional for all 9 per-shader workers; none of those workers have yet been called from the production game loop
-- 9 `gfx_apply_*()` static functions live in `src/shaders/`; pulled into the unity build via `#include` from `graphics_effects.c` — no separate object files, no linker changes needed
-- 21 of 29 audit items marked `[x]`; 3 `.c` files (`graphics_effects.h`, `graphics_effects.c`, a per-shader file) are the owned targets per checklist
-- Original GLSL `.fs` source tree at `third_party/balatro-v011-reference/game_love_extracted/resources/shaders/` (19 files); PSP-latro has C ports for 9 shader bodies + 1 utility + 1 dispatcher
-- Unity build rebuild watcher already covers `src/*.c src/*.h`; added `src/shaders/*.c` to the wildcard dependency
+## Outstanding Items (non-shader)
+- Audio BGM silent on PSP device only (PPSSPP OK) — highest product impact; `audio_callback` instrumentation with `logs/audio.log` pending
+- ~55 Jokers remain `// NOT IMPLEMENTED` in `game.c`
+- Deck selection, vouchers, spectral cards, challenges mode — out of scope for shader pass
 
 ## Relevant Files
 - `docs/checklists/shader-implementation-checklist.md`: 29-item audit with live `[x]/[~]/[ ]/[-]` status and per-item source-evidence notes
-- `docs/trackers/consolidated-status.md`: §Shader/Effects Implementation Status added; 7 wiring-gap (B-1..B-7) table, deferred items table, scratch-buffer note
-- `src/graphics_effects.h`: `GfxEffect` enum (12 IDs) + `GfxEffectParams` struct — unchanged
-- `src/graphics_effects.c`: ~230 lines — math helpers + `gfx_dissolve_mask_alpha()` inline utility + `graphics_build_edition_params()/graphics_build_edition_params_realtime()` + `graphics_effect_apply()` dispatcher + `graphics_effect_is_animated()`; includes all 8 `src/shaders/*.c`
-- `src/shaders/flash.c`: `gfx_apply_flash()` — two white-burst rings carved into alpha
-- `src/shaders/background.c`: `gfx_apply_background()` — pixel-size grid, UV spin, 3-colour paint blend, contrast mod
-- `src/shaders/foil.c`: `gfx_apply_foil()` — 4-term sinusoidal specular boost
-- `src/shaders/hologram.c`: `gfx_apply_holographic()` — time+seed phase offset, 3-osc field, HSL hue-rotation
-- `src/shaders/negative.c`: `gfx_apply_negative()` — HSL chroma derailer, bias boost
-- `src/shaders/polychrome.c`: `gfx_apply_polychrome()` — 3-osc field, shared with hologram, higher frequency
-- `src/shaders/played.c`: `gfx_apply_played()` / `gfx_apply_gold_seal()` / `gfx_apply_voucher()` — card overlay tints + sparkle
-- `src/shaders/dissolve.c`: `gfx_dissolve_mask_alpha()` — 3-term noise, 3×3 average; not yet called by gameplay
-- `src/graphics.c:1635`: `graphics_apply_texture_effect()` — unswizzle → dispatch → re-swizzle → dcache writeback-invalidate; fully functional, no caller
-- `src/graphics.c:1679`: `graphics_set_texture_edition()` — stores edition/seal on Texture struct
-- `src/draw.c:337`: `g_time` — `int32_t`, incremented every `game_draw()` call
-- `src/draw.c:802`: `game_draw_card()` — card base + enhancers + static `tex_editions` draw; no effect-routing call
-- `src/draw.c:2368`: `game_draw_background_depth_layers()` — static quads only, no UV spin
-- `src/game.c:2099`: `game_init_draw_object()` / `game.c:2274/2281/2292`: `g_game_counter`
-- `src/global.h:51-55`: `FlashState { bool active; float remaining_s; }` — declared, never written to
-- `Makefile:26`: `src/main.o` dep wildcard extended to `$(wildcard src/*.c src/*.h src/shaders/*.c)`
+- `docs/trackers/consolidated-status.md`: §Shader/Effects Implementation Status; B-1..B-7 all resolved; dcache and LUT changes recorded
+- `src/trig_lut.h` / `src/trig_lut.c`: cosine LUT module
+- `src/graphics_effects.h`: `GfxEffect` enum (12 IDs) + `GfxEffectParams` struct
+- `src/graphics_effects.c`: math helpers + `gfx_dissolve_mask_alpha()` + `graphics_build_edition_params()` / `graphics_build_edition_params_realtime()` + `graphics_effect_apply()` dispatcher; includes all `src/shaders/*.c`
+- `src/shaders/polychrome.c`: discrete 40-frame `trig_cos_lut` palette stepping
+- `src/shaders/dissolve.c`: LUT applied; 6 time-dependent trig terms precomputed once per pixel invocation
+- `src/shaders/foil.c`, `hologram.c`, `background.c`, `flash.c`: still use libm `sinf`/`cosf`/`sqrtf`; LUT migration candidate
+- `src/graphics.c`: `graphics_apply_texture_effect()` — unswizzle → dispatch → re-swizzle → dcache writeback-invalidate
+- `src/draw.c`: `game_draw_card_edition_effect()` (card scratch pipeline), `game_draw_joker_edition_effect()` (joker scratch pipeline), flash overlay at `draw.c:2792–2817`, dissolve pass at `draw.c:1063–1103`
