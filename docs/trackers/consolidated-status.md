@@ -35,7 +35,7 @@ These features are present in the original Balatro v0.11 but not implemented or 
 - Stake / difficulty system (multiple stakes with modifiers) — not implemented.
 - Save & progression (persistent unlocks, run history) — not implemented.
 - Seeded runs (reproducible runs from a seed) — not implemented.
-- ~55 Jokers are defined but remain `// NOT IMPLEMENTED` in code; they need data and logic implementation.
+- ~20 Jokers defined but remain `enabled: false` or lack scoring call-sites; remaining jokers are enabled but have placeholder/default scoring.
 
 3) High-priority known issues & fixes
 ------------------------------------
@@ -100,13 +100,15 @@ To reduce duplication the following files have been consolidated into this docum
 
 These files remain available in the repository history (use `git log -- docs/<file>` or `git show <sha>:docs/<file>` to retrieve the originals). The removed content was merged here to make triage and prioritization easier.
 
-8) Recommended next actions (small wins)
---------------------------------------
-1. ~~Implement the `audio.c` fixes and add `logs/audio.log` instrumentation; verify on-device.~~ ✅ Done (PR #14)
-2. ~~Replace full dcache flushes with range-scoped writebacks and increase `MAX_QUADS`.~~ ✅ Done
-3. **Implement start screen and menu system** — see §10 below.
-4. Add a CI job (label-triggered) to regenerate artifacts in a pinned container and upload artifacts for review.
-5. Create `docs/checklists/psp3000-checklist.md` (device tests) and add the profiling harness per `guides/devguide-psp3000.md` suggestions.
+ 8) Recommended next actions (small wins)
+ --------------------------------------
+ 1. ~~Implement the `audio.c` fixes and add `logs/audio.log` instrumentation; verify on-device.~~ ✅ Done (PR #14)
+ 2. ~~Replace full dcache flushes with range-scoped writebacks and increase `MAX_QUADS`.~~ ✅ Done
+ 3. ~~Implement start screen and menu system — see §10 below.~~ ✅ Done (Execution log §11, deploy hash `0e19e289`)
+ 4. ~~Add CI jobs to regenerate artifacts in a pinned container and upload for review.~~ ✅ Done (`.github/workflows/pspbuilder.yml`, `assetbuilder.yml`, `testrunner.yml`, `artifact-regenerate.yml`, `pack-eboot-artifact.yml`)
+ 5. ~~Create `docs/checklists/psp3000-checklist.md` (device tests) and add the profiling harness per `guides/devguide-psp3000.md` suggestions.~~ ✅ Done (`docs/checklists/psp3000-checklist.md`, profiler harness at `draw.c`)
+ 6. ~~Add scoring call-sites for high-priority enabled jokers (Steel Joker, Square Joker, Blackboard, Runner) in `src/automated_events.c` `SCORE_JOKERS` section.~~ ✅ Done
+ 7. ~~Fix `game_util_get_new_joker_type()` exhaustion path (`src/game_util.c:590`): fallback now uses any enabled joker of the matching rarity instead of `rand()%JOKER_TYPE_COUNT`.~~ ✅ Done
 
 9) Contact / workflow
 ---------------------

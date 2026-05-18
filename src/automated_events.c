@@ -536,8 +536,6 @@ bool automated_event_score()
                         g_game_state.played_hand.cards[i]->enhancement = CARD_ENHANCEMENT_GOLD;
                         event_add_pop_item(&(g_game_state.played_hand.cards[i]->draw), VARIABLE_TIME(30));
                         used = true;
-
-                        g_joker_types[JOKER_TYPE_GOLDEN_TICKET].enabled = true;
                     }
                 }
                 if (used)
@@ -847,6 +845,7 @@ bool automated_event_score()
                 {
                     AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 0, 4, AUTO_EVENT_VAL(SCORE_PARAM_CURRENT_SCORING_CARD), EVENT_CARD_LOCATION_PLAYED, AUTO_EVENT_VAL(SCORE_PARAM_CURRENT_JOKER_FOR_CARD))
                 }
+                break;
             }
             default:
                 break;
@@ -1260,6 +1259,135 @@ bool automated_event_score()
                 if (param > 0)
                 {
                     AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, param, 0, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_MATADOR:
+            {
+                AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 0, 8, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                break;
+            }
+            case JOKER_TYPE_HIT_THE_ROAD:
+            {
+                int param = game_util_get_joker_param(AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER));
+                if (param > 0)
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, param * 50, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_BOOTSTRAPS:
+            {
+                int param = 0;
+                if (g_game_state.wealth >= 5)
+                {
+                    param = (g_game_state.wealth / 5) * 2;
+                }
+                AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, param, 0, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                break;
+            }
+            case JOKER_TYPE_DRIVERS_LICENSE:
+            {
+                int enhanced = 0;
+                for (int i = 0; i < g_game_state.full_deck.card_count; i++)
+                {
+                    if (g_game_state.full_deck.cards[i]->enhancement != CARD_ENHANCEMENT_NONE)
+                    {
+                        enhanced++;
+                    }
+                }
+                if (enhanced >= 16)
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 300, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_CARTOMANCER:
+            {
+                AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 0, 6, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                break;
+            }
+            case JOKER_TYPE_BURNT_JOKER:
+            {
+                AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 0, 5, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                break;
+            }
+            case JOKER_TYPE_EROSION:
+            case JOKER_TYPE_RESERVED_PARKING:
+            case JOKER_TYPE_MAIL_IN_REBATE:
+            case JOKER_TYPE_TO_THE_MOON:
+            case JOKER_TYPE_PERKEO:
+                break;
+            case JOKER_TYPE_CANIO:
+            {
+                break;
+            }
+            case JOKER_TYPE_TRIBOULET:
+            {
+                AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 30, 0, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                break;
+            }
+            case JOKER_TYPE_YORICK:
+            {
+                int param = game_util_get_joker_param(AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER));
+                if (param > 0)
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 0, param, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_CHICOT:
+            {
+                AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 0, 6, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                break;
+            }
+            case JOKER_TYPE_STEEL_JOKER:
+            {
+                int count = 0;
+                for (int i = 0; i < g_game_state.full_deck.card_count; i++)
+                {
+                    if (g_game_state.full_deck.cards[i]->enhancement == CARD_ENHANCEMENT_STEEL)
+                    {
+                        count++;
+                    }
+                }
+                if (count > 0)
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, count * 20, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_SQUARE_JOKER:
+            {
+                if (g_game_state.played_hand.card_count == 4)
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 400, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_BLACKBOARD:
+            {
+                bool all_spades_clubs = true;
+                for (int i = 0; i < g_game_state.hand.card_count; i++)
+                {
+                    if (g_game_state.hand.cards[i]->suit != CARD_SUIT_SPADES &&
+                        g_game_state.hand.cards[i]->suit != CARD_SUIT_CLUBS)
+                    {
+                        all_spades_clubs = false;
+                        break;
+                    }
+                }
+                if (all_spades_clubs && g_game_state.hand.card_count > 0)
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 0, 300, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
+                }
+                break;
+            }
+            case JOKER_TYPE_RUNNER:
+            {
+                if (game_util_played_hand_contains_straight())
+                {
+                    AUTO_EVENT_CALL(AUTOMATED_EVENT_ADD_SCORE, 7, 0, 15, 0, 0, AUTO_EVENT_VAL(SCORE_PARAM_FINAL_JOKER_COUNTER), EVENT_CARD_LOCATION_JOKER, -1)
                 }
                 break;
             }
@@ -2603,8 +2731,6 @@ bool automated_event_use_tarot()
                         g_game_state.hand.cards[i]->enhancement  = CARD_ENHANCEMENT_GOLD;
                         g_game_state.hand.cards[i]->selected = false;
                         event_add_shake_item(&(g_game_state.hand.cards[i]->draw), 20);
-
-                        g_joker_types[JOKER_TYPE_GOLDEN_TICKET].enabled = true;
                     }
                 }
                 g_game_state.selected_cards_count = 0;
@@ -3101,11 +3227,7 @@ bool automated_event_add_booster_card()
         card->suit = g_game_state.shop.booster_items[g_game_state.highlighted_item].info.card.suit;
         game_add_card_to_full_deck(card);
 
-        if (card->enhancement == CARD_ENHANCEMENT_GOLD)
-        {
-            g_joker_types[JOKER_TYPE_GOLDEN_TICKET].enabled = true;
-        }
-        else if (card->enhancement == CARD_ENHANCEMENT_LUCKY)
+        if (card->enhancement == CARD_ENHANCEMENT_LUCKY)
         {
             g_joker_types[JOKER_TYPE_LUCKY_CAT].enabled = true;
         }
