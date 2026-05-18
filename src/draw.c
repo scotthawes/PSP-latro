@@ -2658,6 +2658,53 @@ float curr_ms = 1.0f;
 float curr_fps = 0.0f;
 int g_frame_count;
 
+/* Per-section profiler initialiser — names must match PROF_SEC_* enum. */
+static const char * const g_prof_section_name[PROF_SEC_COUNT] = {
+    [PROF_SEC_BACKGROUND]     = "background",
+    [PROF_SEC_MENU]           = "menu",
+    [PROF_SEC_GAME_INGAME]    = "game_ingame",
+    [PROF_SEC_BLIND_SELECT]   = "blind_select",
+    [PROF_SEC_SHOP]           = "shop",
+    [PROF_SEC_CARD_BASE]      = "card_base",
+    [PROF_SEC_CARD_EFFECTS]   = "card_fx",
+    [PROF_SEC_TEXT]           = "text",
+    [PROF_SEC_DEBUG_OVERLAY]  = "debug",
+    [PROF_SEC_SUB_INFO]       = "sub_info",
+    [PROF_SEC_FLASH_OVERLAY]  = "flash_ovl",
+    [PROF_SEC_TOTAL_FRAME]    = "frame_total",
+};
+
+struct PerfStats g_prof;
+
+static void profiler_init(struct PerfStats *ps)
+{
+    for (int i = 0; i < PROF_SEC_COUNT; i++) {
+        snprintf(ps->sections[i].name, PROF_SECTION_NAME_LEN, "%s",
+                 g_prof_section_name[i] ? g_prof_section_name[i] : "unknown");
+        ps->sections[i].t0          = 0;
+        ps->sections[i].total_ticks = 0;
+        ps->sections[i].call_count  = 0;
+    }
+    ps->active_section   = -1;
+    ps->section_count    = PROF_SEC_COUNT;
+}
+
+static float profiler_ms_for_section(struct PerfStats *ps, int sec, uint32_t tick_res)
+{
+    if (sec < 0 || sec >= ps->section_count || ps->sections[sec].call_count == 0)
+        return 0.0f;
+    double secs  = (double)ps->sections[sec].total_ticks / (double)tick_res;
+    return (float)(secs * 1000.0);
+}
+
+static float profiler_pct_for_section(struct PerfStats *ps, int sec)
+{
+    if (sec < 0 || sec >= ps->section_count) return 0.0f;
+    uint64_t frame_total = ps->sections[PROF_SEC_TOTAL_FRAME].total_ticks;
+    if (frame_total == 0) return 0.0f;
+    return 100.0f * (float)ps->sections[sec].total_ticks / (float)frame_total;
+}
+
 void game_draw_debug_info()
 {
     if (last_tick == 0) { sceRtcGetCurrentTick(&last_tick); }
@@ -2679,6 +2726,12 @@ void game_draw_debug_info()
     }
 
     #ifdef DEBUG
+    /* ── First call: lazily initialise profiler ─────────────────────── */
+    static bool profiler_ready = false;
+    if (!profiler_ready) {
+        profiler_ready = true;
+        profiler_init(&g_prof);
+    }
     char str[32];
     sprintf(str, "FPS: %0.2f", curr_fps);
     graphics_draw_text(font_small, str, 400, 0, 1.0f, COLOR_WHITE);
@@ -2688,6 +2741,25 @@ void game_draw_debug_info()
         graphics_draw_text(font_small, str, 370, 8, 1.0f, COLOR_WHITE);
         sprintf(str, "audio w write: %d", g_debug_info.audio_wait_write);
         graphics_draw_text(font_small, str, 364, 16, 1.0f, COLOR_WHITE);
+    }
+
+    /* ── profiler per-section breakdown ─────────────────────────────────── */
+    {
+        float frame_ms = profiler_ms_for_section(&g_prof, PROF_SEC_TOTAL_FRAME, tick_res);
+        sprintf(str, "f:%.1fms", frame_ms);
+        graphics_draw_text(font_small, str, 4, 0, 1.0f, COLOR_WHITE);
+
+        int y = 8;
+        for (int i = 0; i < PROF_SEC_COUNT; i++) {
+            if (i == PROF_SEC_TOTAL_FRAME) continue;              /* already printed */
+            if (g_prof.sections[i].call_count == 0) continue;
+            float ms = profiler_ms_for_section(&g_prof, i, tick_res);
+            float pct = profiler_pct_for_section(&g_prof, i);
+            sprintf(str, "%s %.1fms %.0f%%", g_prof.sections[i].name, ms, pct);
+            graphics_draw_text(font_small, str, 4, y, 1.0f, COLOR_TEXT_ORANGE);
+            y += 8;
+            if (y > SCREEN_HEIGHT - 8) break;  /* don't wrap past bottom */
+        }
     }
     #endif
 }
@@ -2737,6 +2809,9 @@ void game_draw()
     graphics_begin_draw();
     g_time++;
 
+    /* profiler: reset TOTAL_FRAME counter each frame */
+    PROF_SECTION(&g_prof, PROF_SEC_TOTAL_FRAME);
+
     graphics_clear(COLOR_BACKGROUND_2);
 
     if (g_game_state.stage == GAME_STAGE_BLINDS ||
@@ -2744,40 +2819,62 @@ void game_draw()
         g_game_state.stage == GAME_STAGE_SHOP ||
         g_game_state.stage == GAME_STAGE_MENU)
     {
+        PROF_SECTION(&g_prof, PROF_SEC_BACKGROUND);
         game_draw_background_depth_layers();
+        PROF_END(&g_prof);
     }
 
     switch (g_game_state.stage)
     {
         case GAME_STAGE_MENU:
+        {
+            PROF_SECTION(&g_prof, PROF_SEC_MENU);
             menu_draw();
+            PROF_END(&g_prof);
             break;
+        }
         case GAME_STAGE_BLINDS:
-            game_draw_blind_select();            
+        {
+            PROF_SECTION(&g_prof, PROF_SEC_BLIND_SELECT);
+            game_draw_blind_select();
+            PROF_END(&g_prof);
             break;
+        }
         case GAME_STAGE_INGAME:
+        {
+            PROF_SECTION(&g_prof, PROF_SEC_GAME_INGAME);
             game_draw_ingame();
+            PROF_END(&g_prof);
             break;
+        }
         case GAME_STAGE_SHOP:
         {
+            PROF_SECTION(&g_prof, PROF_SEC_SHOP);
             game_draw_shop();
+            PROF_END(&g_prof);
             break;
         }
     }
 
     if (g_game_state.sub_stage == GAME_SUBSTAGE_DECK_INFO)
     {
+        PROF_SECTION(&g_prof, PROF_SEC_SUB_INFO);
         game_draw_deck_info();
+        PROF_END(&g_prof);
     }
 
     if (g_game_state.sub_stage == GAME_SUBSTAGE_RUN_INFO)
     {
+        PROF_SECTION(&g_prof, PROF_SEC_SUB_INFO);
         game_draw_run_info();
+        PROF_END(&g_prof);
     }
 
     if (g_settings.debug_overlay)
     {
+        PROF_SECTION(&g_prof, PROF_SEC_DEBUG_OVERLAY);
         game_draw_debug_info();
+        PROF_END(&g_prof);
     }
 
     /* white flash overlay — runs flash.fs against a copy of the rendered frame */
@@ -2807,6 +2904,8 @@ void game_draw()
         }
         graphics_set_no_texture();
     }
+
+    PROF_END(&g_prof);
 
     graphics_end_draw();
 }

@@ -158,6 +158,72 @@ struct DebugInfo
 
 extern struct DebugInfo g_debug_info;
 
+/* ─── Profiling harness ─────────────────────────────────────────────── */
+/*  PSP-3000 device test timing: per-section frame instrumentation.      */
+/*  Gates on DEBUG so it compiles to zero cost in release builds.        */
+
+#define PROF_SECTION_COUNT     16
+#define PROF_SECTION_NAME_LEN  24
+
+struct ProfilerSection
+{
+    char        name[PROF_SECTION_NAME_LEN];
+    uint64_t    t0;                /* start tick of the most recent PROF_SECTION */
+    uint64_t    total_ticks;       /* cumulative elapsed ticks across all frames */
+    uint32_t    call_count;        /* number of times this section was profiled */
+};
+
+struct PerfStats
+{
+    struct ProfilerSection   sections[PROF_SECTION_COUNT];
+    int                      active_section;
+    int                      section_count;   /* set to PROF_SEC_COUNT at init */
+};
+
+extern struct PerfStats g_prof;
+
+#ifdef DEBUG
+#define PROF_SECTION(STATS_PTR, IDX) \
+    do { \
+        if ((IDX) < (STATS_PTR)->section_count) { \
+            (STATS_PTR)->active_section = (IDX); \
+            sceRtcGetCurrentTick(&(STATS_PTR)->sections[(IDX)].t0); \
+        } \
+    } while (0)
+
+#define PROF_END(STATS_PTR) \
+    do { \
+        int _idx = (STATS_PTR)->active_section; \
+        if (_idx >= 0 && _idx < (STATS_PTR)->section_count) { \
+            uint64_t _t_end; \
+            sceRtcGetCurrentTick(&_t_end); \
+            uint64_t _delta = _t_end - (STATS_PTR)->sections[_idx].t0; \
+            (STATS_PTR)->sections[_idx].total_ticks += \
+                (_delta > 0 ? _delta : 0); \
+            (STATS_PTR)->sections[_idx].call_count++; \
+            (STATS_PTR)->active_section = -1; \
+        } \
+    } while (0)
+#else
+#define PROF_SECTION(STATS_PTR, IDX)         ((void)0)
+#define PROF_END(STATS_PTR)                  ((void)0)
+#endif
+
+#define PROF_SEC_BACKGROUND       0
+#define PROF_SEC_MENU             1
+#define PROF_SEC_GAME_INGAME      2
+#define PROF_SEC_BLIND_SELECT     3
+#define PROF_SEC_SHOP             4
+#define PROF_SEC_CARD_BASE        5
+#define PROF_SEC_CARD_EFFECTS     6
+#define PROF_SEC_TEXT             7
+#define PROF_SEC_DEBUG_OVERLAY    8
+#define PROF_SEC_SUB_INFO         9
+#define PROF_SEC_FLASH_OVERLAY   10
+#define PROF_SEC_TOTAL_FRAME     11
+
+#define PROF_SEC_COUNT   (PROF_SEC_TOTAL_FRAME + 1)
+
 struct Card
 {
     struct DrawObject draw;
