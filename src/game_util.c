@@ -1,4 +1,16 @@
-#include "global.h"
+
+#ifdef __PSP__
+#  include "global.h"
+#else
+// For non-PSP builds, ensure 'pspkernel.h' is not required by 'global.h'.
+#  define PSP_KERNEL_STUB
+#  include "global.h"
+#  include <math.h>
+#  include <stdlib.h>
+#  include <stdio.h>
+#  include <string.h>
+#  include <time.h>
+#endif
 
 int inner_game_util_joker_type(int index, int starting_index, bool first)
 {
@@ -587,8 +599,19 @@ int game_util_get_new_joker_type(int excluded_joker_types[], int excluded_joker_
         }
     }
 
-    // TODO : add repeated jokers if possible_joker_count == 0
-    // Fallback: allow repeated jokers if pool is exhausted
+    // When the matching-rarity pool is exhausted, fall back to any enabled
+    // joker of the same rarity — allowing repeats of jokers already in the run.
+    if (possible_joker_count == 0)
+    {
+        for (int i = 0; i < JOKER_TYPE_COUNT; i++)
+        {
+            if (g_joker_types[i].enabled && g_joker_types[i].rarity == rarity)
+            {
+                possible_jokers[possible_joker_count++] = i;
+            }
+        }
+    }
+
     if (possible_joker_count == 0) return rand() % JOKER_TYPE_COUNT;
 
     return possible_jokers[rand()%possible_joker_count];
