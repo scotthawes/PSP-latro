@@ -488,39 +488,41 @@ uint32_t* bitmap1_to_rgba32(const unsigned char* data, int width, int height) {
     return buffer;
 }
 
-int graphics_load_font_from_1bit_buffer(const char *buffer, int width, int height, int length_x, int length_y)
-{
-    if (g_font_count >= MAX_FONTS)
+    int graphics_load_font_from_1bit_buffer(const char *buffer, int width, int height, int length_x, int length_y)
     {
-        fprintf(stderr, "Maximum amount of fonts reached.");
-        return -1;
-    }
+        if (g_font_count >= MAX_FONTS)
+        {
+            fprintf(stderr, "Maximum amount of fonts reached.");
+            return -1;
+        }
 
-    struct Image image;
-    image.data = (uint8_t*)bitmap1_to_rgba32((unsigned char*)buffer, width * length_x, height * length_y);
-    image.w = width * length_x;
-    image.h = height * length_y;
-    image.channels = 4;
-    int texture = graphics_load_texture_from_image_16bit(&image, 0, 0);
-    graphics_destroy_image(&image);
-    if (texture < 0)
-    {
-        return -1;
-    }
+        struct Image image;
+        image.data = (uint8_t*)bitmap1_to_rgba32((unsigned char*)buffer, width * length_x, height * length_y);
+        image.w = width * length_x;
+        image.h = height * length_y;
+        image.channels = 4;
+        int texture = graphics_load_texture_from_image_16bit(&image, 0, 0);
+        graphics_destroy_image(&image);
+        if (texture < 0)
+        {
+            return -1;
+        }
 
-    int font_slot = 0;
-    while(g_fonts[font_slot].in_use)
-    {
-        font_slot++;
-    }
+        int font_slot = 0;
+        while(g_fonts[font_slot].in_use)
+        {
+            font_slot++;
+        }
 
-    g_fonts[font_slot].in_use = true;
-    g_fonts[font_slot].texture = texture;
-    g_fonts[font_slot].width = width;
-    g_fonts[font_slot].height = height;
-    g_fonts[font_slot].length_x = length_x;
-    g_fonts[font_slot].length_y = length_y;
-    sceKernelDcacheWritebackInvalidateAll();
+        g_fonts[font_slot].in_use = true;
+        g_fonts[font_slot].texture = texture;
+        g_fonts[font_slot].width = width;
+        g_fonts[font_slot].height = height;
+        g_fonts[font_slot].length_x = length_x;
+        g_fonts[font_slot].length_y = length_y;
+        sceKernelDcacheWritebackRange(
+            g_textures[texture].data,
+            (size_t)g_textures[texture].width * (size_t)g_textures[texture].bytes_per_pixel * (size_t)g_textures[texture].height);
 
 #ifdef DEBUG
     graphics_debug_validate_font_ascii_coverage(font_slot);
@@ -721,7 +723,7 @@ int graphics_load_texture_from_image(struct Image *loaded_image, int start_x, in
     g_textures[texture_slot].data = image_swizzled;
     g_textures[texture_slot].format = GU_PSM_8888;
     g_textures[texture_slot].bytes_per_pixel = 4;
-    sceKernelDcacheWritebackInvalidateAll();
+    sceKernelDcacheWritebackRange(image_swizzled, (size_t)desired_width * (size_t)desired_height * 4);
 
     g_texture_count++;
 
@@ -812,7 +814,7 @@ int graphics_load_texture_from_image_16bit(struct Image *loaded_image, int start
     g_textures[texture_slot].data = image_swizzled;
     g_textures[texture_slot].format = GU_PSM_4444;
     g_textures[texture_slot].bytes_per_pixel = 2;
-    sceKernelDcacheWritebackInvalidateAll();
+    sceKernelDcacheWritebackRange(image_swizzled, (size_t)desired_width * (size_t)desired_height * 2);
 
     g_texture_count++;
 
@@ -908,6 +910,47 @@ int graphics_load_texture_16bit(const char *filename, int start_x, int start_y)
     return texture_slot;
 }
 
+int graphics_load_texture_from_raw_rgba(const char *label, const uint8_t *pixels, int width, int height)
+{
+    if (g_texture_count >= MAX_TEXTURES) return -1;
+
+    int pow2_w = get_closest_power_of_2(width);
+    int pow2_h = get_closest_power_of_2(height);
+    if (pow2_w <= 0 || pow2_h <= 0) return -1;
+
+    int texture_slot = 0;
+    while (g_textures[texture_slot].in_use)
+        texture_slot++;
+
+    /* Swizzle linear RGBA8 -> GPU layout */
+    uint8_t *linear = (uint8_t *)malloc((size_t)pow2_w * (size_t)pow2_h * 4);
+    if (linear == NULL) return -1;
+    memset(linear, 0, (size_t)pow2_w * (size_t)pow2_h * 4);
+    /* copy only the valid region */
+    for (int j = 0; j < height && j < pow2_h; j++)
+        memcpy(linear + (size_t)j * pow2_w * 4, pixels + (size_t)j * width * 4, (size_t)width * 4);
+
+    uint8_t *swizzled = (uint8_t *)memalign(16, pow2_w * pow2_h * 4);
+    if (swizzled == NULL) { free(linear); return -1; }
+    swizzle_fast(swizzled, linear, pow2_w * 4, pow2_h);
+    free(linear);
+
+    g_textures[texture_slot].in_use         = true;
+    g_textures[texture_slot].width          = pow2_w;
+    g_textures[texture_slot].height         = pow2_h;
+    g_textures[texture_slot].content_width  = width;
+    g_textures[texture_slot].content_height = height;
+    g_textures[texture_slot].data           = swizzled;
+    g_textures[texture_slot].format         = GU_PSM_8888;
+    g_textures[texture_slot].bytes_per_pixel = 4;
+    sceKernelDcacheWritebackRange(swizzled, (size_t)pow2_w * (size_t)pow2_h * 4);
+
+    DEBUG_PRINTF("[TEX][RAW-RGBA] slot=%d %dx%d (%dx%d) label=%s\n",
+                 texture_slot, width, height, pow2_w, pow2_h, label);
+
+    return texture_slot;
+}
+
 int graphics_load_font(const char *filename, int width, int height, int length_x, int length_y)
 {
     if (g_font_count >= MAX_FONTS)
@@ -934,7 +977,9 @@ int graphics_load_font(const char *filename, int width, int height, int length_x
     g_fonts[font_slot].height = height;
     g_fonts[font_slot].length_x = length_x;
     g_fonts[font_slot].length_y = length_y;
-    sceKernelDcacheWritebackInvalidateAll();
+    sceKernelDcacheWritebackRange(
+        g_textures[texture].data,
+        (size_t)g_textures[texture].width * (size_t)g_textures[texture].bytes_per_pixel * (size_t)g_textures[texture].height);
 
 #ifdef DEBUG
     graphics_debug_validate_font_ascii_coverage(font_slot);

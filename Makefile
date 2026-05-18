@@ -25,9 +25,9 @@ PSP_EBOOT_TITLE = PSPalatro
 PSP_EBOOT_ICON = media/third-party/game_icon-0.png
 PSP_EBOOT_PIC1 = media/third-party/image-1.png
 
-# Unity-build dependency: main.c includes many src/*.c and src/*.h files.
-# Rebuild main.o when any included source/header changes.
-src/main.o: $(wildcard src/*.c src/*.h)
+# Unity-build dependency: main.c includes src/*.c and src/*.h; graphics_effects.c
+# includes src/shaders/*.c.  Rebuild main.o when any included source/header changes.
+src/main.o: $(wildcard src/*.c src/*.h src/shaders/*.c)
 
 include $(PSPSDK)/lib/build.mak
 

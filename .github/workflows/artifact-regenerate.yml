@@ -1,0 +1,114 @@
+name: Artifact Regeneration (Label-Triggered)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  regenerate:
+    # Only run when the feature/regen label is applied
+    if: contains(github.event.pull_request.labels.*.name, 'regenerate-artifacts')
+    runs-on: ubuntu-latest
+    container:
+      # PINNED — update this tag when upgrading the SDK toolchain.
+      # Current working tag: pspdev/psp-sdk:1.0.0
+      # See https://hub.docker.com/r/pspdev/psp-sdk/tags for available versions.
+      image: pspdev/psp-sdk:1.0.0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log environment info
+        run: |
+          echo "=== Container image ==="
+          cat /etc/os-release || true
+          which psp-config || true
+          psp-config --version || true
+          echo "=== Git context ==="
+          echo "SHA: ${{ github.sha }}"
+          echo "Ref:  ${{ github.ref }}"
+          echo "PR:   ${{ github.event.pull_request.number }}"
+
+      - name: Restore cached pspsdk
+        id: cache-pspsdk
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/pspdev
+          key: pspsdk-${{ runner.os }}-1.0.0
+          restore-keys: |
+            pspsdk-${{ runner.os }}-
+
+      - name: Setup PSP environment
+        run: |
+          echo "PSPDEV=/usr/local/pspdev" >> $GITHUB_ENV
+          echo "/usr/local/pspdev/bin" >> $GITHUB_PATH
+          echo "/usr/local/pspdev/psp/bin" >> $GITHUB_PATH
+
+      - name: Regenerate assets (AssetBuilder)
+        run: |
+          echo "Running AssetBuilder in pinned container..."
+          chmod +x scripts/asset_builder/build_assets.sh
+          scripts/asset_builder/build_assets.sh
+          echo "---"
+          ls -lh assets/out || true
+          echo "--- manifest ---"
+          cat assets/out/manifest.json 2>/dev/null || echo "(no manifest)"
+
+      - name: Build project (PSPBuilder)
+        run: |
+          echo "Building PSP-latro..."
+          make clean || true
+          make -j$(nproc)
+          echo "---"
+          ls -lh EBOOT.PBP pspalatro.elf build/ 2>/dev/null || true
+
+      - name: Record build metadata (JSON manifest)
+        run: |
+          MANIFEST_DIR=".copilot/artifacts"
+          mkdir -p "$MANIFEST_DIR"
+          COMMIT="$(git rev-parse --short HEAD || echo unknown)"
+          cat > "$MANIFEST_DIR/regenerate-${COMMIT}.json" <<EOF
+          {
+            "prompt_file": "main.yml:regenerate job",
+            "prompt_version": "1.0",
+            "model": "kilo/kilo-auto",
+            "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "regenerate_command": "scripts/asset_builder/build_assets.sh && make clean && make -j$(nproc)",
+            "container": "pspdev/psp-sdk:1.0.0",
+            "commit": "$COMMIT",
+            "branch": "$(git rev-parse --abbrev-ref HEAD || echo unknown)",
+            "event": "label: regenerate-artifacts",
+            "github_ref": "${{ github.ref }}",
+            "github_sha": "${{ github.sha }}",
+            "github_run_id": "${{ github.run_id }}"
+          }
+          EOF
+          echo "--- manifest ---"
+          cat "$MANIFEST_DIR/regenerate-${COMMIT}.json"
+
+      - name: Upload asset and build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: regenerated-artifacts-${{ github.sha }}
+          path: |
+            assets/out/
+            EBOOT.PBP
+            pspalatro.elf
+            build/
+            .copilot/artifacts/regenerate-*.json
+          retention-days: 14
+
+      - name: Print review instructions
+        run: |
+          echo ""
+          echo "=== Artifact review ==="
+          echo "Tags:   pspdev/psp-sdk:1.0.0"
+          echo "Assets: see uploaded artifact 'regenerated-artifacts-${{ github.sha }}'"
+          echo ""
+          echo "To update the pinned tag after verified testing:"
+          echo "  1. Edit the 'container: image' field in this workflow YAML."
+          echo "  2. Update any build scripts that hard-code the SDK image."
+          echo "  3. Commit with a note specifying the new tag and verification result."
+          echo ""

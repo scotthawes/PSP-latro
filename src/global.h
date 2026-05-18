@@ -43,7 +43,17 @@
 
 void boot_log(const char *message);
 
+#include "graphics_effects.h"
+
 extern uint32_t g_game_counter;
+
+/* flash.fs equivalent — trigger state for win/score animations */
+struct FlashState
+{
+    bool        active;
+    float       remaining_s;
+};
+extern struct FlashState g_flash_state;
 
 struct Settings
 {
@@ -148,6 +158,72 @@ struct DebugInfo
 
 extern struct DebugInfo g_debug_info;
 
+/* ─── Profiling harness ─────────────────────────────────────────────── */
+/*  PSP-3000 device test timing: per-section frame instrumentation.      */
+/*  Gates on DEBUG so it compiles to zero cost in release builds.        */
+
+#define PROF_SECTION_COUNT     16
+#define PROF_SECTION_NAME_LEN  24
+
+struct ProfilerSection
+{
+    char        name[PROF_SECTION_NAME_LEN];
+    uint64_t    t0;                /* start tick of the most recent PROF_SECTION */
+    uint64_t    total_ticks;       /* cumulative elapsed ticks across all frames */
+    uint32_t    call_count;        /* number of times this section was profiled */
+};
+
+struct PerfStats
+{
+    struct ProfilerSection   sections[PROF_SECTION_COUNT];
+    int                      active_section;
+    int                      section_count;   /* set to PROF_SEC_COUNT at init */
+};
+
+extern struct PerfStats g_prof;
+
+#ifdef DEBUG
+#define PROF_SECTION(STATS_PTR, IDX) \
+    do { \
+        if ((IDX) < (STATS_PTR)->section_count) { \
+            (STATS_PTR)->active_section = (IDX); \
+            sceRtcGetCurrentTick(&(STATS_PTR)->sections[(IDX)].t0); \
+        } \
+    } while (0)
+
+#define PROF_END(STATS_PTR) \
+    do { \
+        int _idx = (STATS_PTR)->active_section; \
+        if (_idx >= 0 && _idx < (STATS_PTR)->section_count) { \
+            uint64_t _t_end; \
+            sceRtcGetCurrentTick(&_t_end); \
+            uint64_t _delta = _t_end - (STATS_PTR)->sections[_idx].t0; \
+            (STATS_PTR)->sections[_idx].total_ticks += \
+                (_delta > 0 ? _delta : 0); \
+            (STATS_PTR)->sections[_idx].call_count++; \
+            (STATS_PTR)->active_section = -1; \
+        } \
+    } while (0)
+#else
+#define PROF_SECTION(STATS_PTR, IDX)         ((void)0)
+#define PROF_END(STATS_PTR)                  ((void)0)
+#endif
+
+#define PROF_SEC_BACKGROUND       0
+#define PROF_SEC_MENU             1
+#define PROF_SEC_GAME_INGAME      2
+#define PROF_SEC_BLIND_SELECT     3
+#define PROF_SEC_SHOP             4
+#define PROF_SEC_CARD_BASE        5
+#define PROF_SEC_CARD_EFFECTS     6
+#define PROF_SEC_TEXT             7
+#define PROF_SEC_DEBUG_OVERLAY    8
+#define PROF_SEC_SUB_INFO         9
+#define PROF_SEC_FLASH_OVERLAY   10
+#define PROF_SEC_TOTAL_FRAME     11
+
+#define PROF_SEC_COUNT   (PROF_SEC_TOTAL_FRAME + 1)
+
 struct Card
 {
     struct DrawObject draw;
@@ -159,7 +235,13 @@ struct Card
 
     uint8_t enhancement, edition, seal;
 
-    bool selected;    
+    bool selected;
+
+    /* Per-card animation / effect state */
+    float      dissolve;         /* 0 = opaque → 1 = fully dissolved (dissolve card animation); -1 = not dissolving */
+    float      score_counter;    /* counts up while a card is being evaluated */
+    float      edition_t0;       /* game-time anchor (seconds) for edition animation */
+    bool       dissolving;       /* true → card is in active dissolve animation */
 };
 
 #define MAX_CARDS  1024
@@ -365,6 +447,7 @@ struct Joker
 
     uint8_t type;
     uint8_t edition;
+    float   edition_t0;    /* game-time anchor (seconds) for edition animation (mirrors Card.edition_t0) */
     int param1;
     int repeat;
 
@@ -394,6 +477,8 @@ struct Jokers
 #define PLANET_TYPE_ERIS        11
 
 #define PLANET_TYPE_COUNT       12
+
+#define POLYCHROME_FRAME_S 0.6667f
 
 #define HINT_PLANET_TYPE_LENGTH  4
 
@@ -1184,6 +1269,7 @@ int graphics_load_texture_from_archive_16bit(const char *filename, int start_x, 
 int graphics_load_texture(const char *filename, int start_x, int start_y);
 int graphics_load_texture_16bit(const char *filename, int start_x, int start_y);
 int graphics_load_wallpaper(const char *filename);
+int graphics_load_texture_from_raw_rgba(const char *label, const uint8_t *pixels, int width, int height);
 bool graphics_get_texture_content_size(int texture, int *out_width, int *out_height);
 void graphics_destroy_texture(int texture);
 int graphics_load_font(const char *filename, int width, int height, int length_x, int length_y);
