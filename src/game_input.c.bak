@@ -1156,9 +1156,6 @@ void game_input_update(bool no_input)
         case INPUT_FOCUSED_ZONE_MENU_SETUP:
             menu_input_setup(no_input);
             break;
-        case INPUT_FOCUSED_ZONE_MENU_COLLECTION:
-            menu_input_collection(no_input);
-            break;
         default:
             break;
     }

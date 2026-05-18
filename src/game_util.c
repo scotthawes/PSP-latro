@@ -1,6 +1,7 @@
 
 #ifdef __PSP__
 #  include "global.h"
+#  include <math.h>
 #else
 // For non-PSP builds, ensure 'pspkernel.h' is not required by 'global.h'.
 #  define PSP_KERNEL_STUB
@@ -461,29 +462,66 @@ bool game_util_is_consumable_slot_available()
     return g_game_state.consumables.item_count < g_game_state.consumable_slots;
 }
 
+/* ===================================================================
+   STAKE MULTIPLIERS
+   =================================================================== */
+
+const float g_stake_blind_score_mults[STAKE_TYPE_COUNT] = { 1.0f, 1.25f, 1.50f, 2.00f };
+const float g_stake_price_mults[STAKE_TYPE_COUNT]       = { 1.0f, 1.25f, 1.50f, 2.00f };
+
+float game_util_get_stake_blind_mult(void)
+{
+    return g_stake_blind_score_mults[CLAMP(g_settings.stake, 0, STAKE_TYPE_COUNT - 1)];
+}
+
+float game_util_get_stake_price_mult(void)
+{
+    return g_stake_price_mults[CLAMP(g_settings.stake, 0, STAKE_TYPE_COUNT - 1)];
+}
+
+/* ===================================================================
+   PRICE HELPERS – stake-aware
+   =================================================================== */
+
+static inline float _stake_price(float base)
+{
+    return base * game_util_get_stake_price_mult();
+}
+
 int game_util_get_joker_buy_price(struct Joker *joker)
 {
-    return g_joker_types[joker->type].value;
+    return (int)ceilf(_stake_price((float)g_joker_types[joker->type].value));
 }
 
 int game_util_get_joker_sell_price(struct Joker *joker)
 {
-    return g_joker_types[joker->type].value / 2;
+    return (int)ceilf(_stake_price((float)g_joker_types[joker->type].value) * 0.5f);
 }
 
 int game_util_get_booster_price(struct BoosterPack *booster)
 {
-    switch(booster->size)
-    {
-        case BOOSTER_PACK_SIZE_NORMAL:
-            return 4;
-        case BOOSTER_PACK_SIZE_JUMBO:
-            return 6;
-        case BOOSTER_PACK_SIZE_MEGA:
-            return 8;
-    }
+    static const float base_prices[] = { 4.0f, 6.0f, 8.0f };
+    return (int)ceilf(_stake_price(base_prices[booster->size]));
+}
 
-    return 0;
+int game_util_get_planet_buy_price(struct Planet *planet)
+{
+    return (int)ceilf(_stake_price(3.0f));
+}
+
+int game_util_get_planet_sell_price(struct Planet *planet)
+{
+    return (int)ceilf(_stake_price(3.0f) * 0.5f);
+}
+
+int game_util_get_tarot_buy_price(struct Tarot *tarot)
+{
+    return (int)ceilf(_stake_price(3.0f));
+}
+
+int game_util_get_tarot_sell_price(struct Tarot *tarot)
+{
+    return (int)ceilf(_stake_price(3.0f) * 0.5f);
 }
 
 int game_util_get_first_shop_single_index()
@@ -685,26 +723,6 @@ int game_util_get_new_planet_type(int excluded_planet_types[], int excluded_plan
     }
 
     return possible_planet[rand()%possible_planet_count];
-}
-
-int game_util_get_planet_buy_price(struct Planet *planet)
-{
-    return 3;
-}
-
-int game_util_get_planet_sell_price(struct Planet *planet)
-{
-    return 1;
-}
-
-int game_util_get_tarot_buy_price(struct Tarot *tarot)
-{
-    return 3;
-}
-
-int game_util_get_tarot_sell_price(struct Tarot *tarot)
-{
-    return 1;
 }
 
 int game_util_get_reroll_cost()

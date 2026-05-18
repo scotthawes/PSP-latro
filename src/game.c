@@ -42,7 +42,32 @@ char *g_poker_hand_names[GAME_POKER_HAND_COUNT] =
     "Straight flush",   // GAME_POKER_HAND_STRAIGHT_FLUSH
     "Five of a kind",   // GAME_POKER_HAND_FIVE_OF_A_KIND
     "Flush house",      // GAME_POKER_HAND_FLUSH_HOUSE
-    "Flush five"        // GAME_POKER_HAND_FLUSH_FIVE
+     "Flush five"        // GAME_POKER_HAND_FLUSH_FIVE
+};
+
+const char *g_deck_type_names[DECK_TYPE_COUNT] = {
+    "Red",       // DECK_TYPE_RED
+    "Blue",      // DECK_TYPE_BLUE
+    "Yellow",    // DECK_TYPE_YELLOW
+    "Green",     // DECK_TYPE_GREEN
+    "Black",     // DECK_TYPE_BLACK
+    "Magic",     // DECK_TYPE_MAGIC
+    "Nebula",    // DECK_TYPE_NEBULA
+    "Ghost",     // DECK_TYPE_GHOST
+    "Abandoned", // DECK_TYPE_ABANDONED
+    "Checkered", // DECK_TYPE_CHECKERED
+    "Zodiac",    // DECK_TYPE_ZODIAC
+    "Painted",   // DECK_TYPE_PAINTED
+    "Anaglyph",  // DECK_TYPE_ANAGLYPH
+    "Plasma",    // DECK_TYPE_PLASMA
+    "Erratic",   // DECK_TYPE_ERRATIC
+};
+
+const char *g_stake_type_names[STAKE_TYPE_COUNT] = {
+    "White",  // STAKE_TYPE_WHITE
+    "Red",    // STAKE_TYPE_RED
+    "Blue",   // STAKE_TYPE_BLUE
+    "Black",  // STAKE_TYPE_BLACK
 };
 
 struct JokerType g_joker_types[JOKER_TYPE_COUNT] = {
@@ -476,7 +501,10 @@ double game_get_current_blind_score()
 {
     double score = game_get_ante_base_score();
 
-    return score * (1.0 + (double)g_game_state.blind * 0.5);
+    score *= (1.0 + (double)g_game_state.blind * 0.5);
+    score *= (double)game_util_get_stake_blind_mult();
+
+    return score;
 }
 
 void game_set_card_name(struct Card *card, char *name)
@@ -1730,6 +1758,26 @@ bool game_init_load_file_values()
                 int value = atoi(buffer);
                 g_settings.wallpaper_variant = CLAMP(value, 0, 1);
             }
+            else if (!strcmp(buffer, "deck_type"))
+            {
+                token_type = ini_read_token(buffer, 128);
+                if (token_type != INI_TOKEN_VALUE) return false;
+                int value = atoi(buffer);
+                g_settings.deck_type = CLAMP(value, 0, DECK_TYPE_COUNT - 1);
+            }
+            else if (!strcmp(buffer, "seed"))
+            {
+                token_type = ini_read_token(buffer, 128);
+                if (token_type != INI_TOKEN_VALUE) return false;
+                snprintf(g_settings.seed, sizeof(g_settings.seed), "%.8s", buffer);
+            }
+            else if (!strcmp(buffer, "stake"))
+            {
+                token_type = ini_read_token(buffer, 128);
+                if (token_type != INI_TOKEN_VALUE) return false;
+                int value = atoi(buffer);
+                g_settings.stake = CLAMP(value, 0, STAKE_TYPE_COUNT - 1);
+            }
         }
         else if (token_type == INI_TOKEN_ERROR)
         {
@@ -1774,6 +1822,9 @@ bool game_save_file_values()
     fprintf(f, "speed = %d\n", g_settings.speed);
     fprintf(f, "ante_score_scaling = %d\n", g_settings.ante_score_scaling);
     fprintf(f, "wallpaper_variant = %d\n", g_settings.wallpaper_variant);
+    fprintf(f, "deck_type = %d\n", g_settings.deck_type);
+    fprintf(f, "seed = %s\n", g_settings.seed);
+    fprintf(f, "stake = %d\n", g_settings.stake);
 
     fclose(f);
     snprintf(g_settings_file_path, sizeof(g_settings_file_path), "%s", settings_path);
@@ -1782,7 +1833,32 @@ bool game_save_file_values()
 
 void game_init_logic()
 {
-    srand(time(0));
+    /* Clamp persisted settings into valid ranges at run start */
+    g_settings.deck_type = CLAMP(g_settings.deck_type,  0, DECK_TYPE_COUNT - 1);
+    g_settings.stake    = CLAMP(g_settings.stake,       0, STAKE_TYPE_COUNT - 1);
+
+    /* Seed RNG deterministically from settings.seed when present,
+       falling back to wall-clock time for random runs. */
+    if (g_settings.seed[0] != '\0')
+    {
+        uint32_t hash = 0;
+        const char *p = g_settings.seed;
+        while (*p)
+        {
+            hash = ((hash << 5) + hash) + (unsigned char)(*p++);
+        }
+        srand(hash);
+    }
+    else
+    {
+        srand((unsigned int)time(0));
+        /* Auto-generate a random 8-char seed for fresh runs */
+        for (int i = 0; i < 8; i++)
+        {
+            g_settings.seed[i] = g_seed_alphabet[rand() % SEED_CHAR_COUNT];
+        }
+        g_settings.seed[8] = '\0';
+    }
 
     // TODO: ignoring spectral boosters for now
     for (int i = 0; i < BOOSTER_PACK_TYPE_COUNT - 1; i++)

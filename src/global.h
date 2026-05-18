@@ -73,6 +73,9 @@ struct Settings
     int ante_score_scaling;
     int speed;
     int wallpaper_variant;
+    int deck_type;
+    int stake;
+    char seed[9];
 };
 
 extern struct Settings g_settings;
@@ -593,6 +596,50 @@ extern double g_booster_packs_weights_total;
 #define GAME_SUBSTAGE_MENU_TITLE    0
 #define GAME_SUBSTAGE_MENU_MAIN     1
 #define GAME_SUBSTAGE_MENU_OPTIONS  2
+#define GAME_SUBSTAGE_MENU_SETUP    3
+#define GAME_SUBSTAGE_MENU_COLLECTION  4
+
+#define DECK_TYPE_COUNT 15
+enum
+{
+    DECK_TYPE_RED       = 0,
+    DECK_TYPE_BLUE      = 1,
+    DECK_TYPE_YELLOW    = 2,
+    DECK_TYPE_GREEN     = 3,
+    DECK_TYPE_BLACK     = 4,
+    DECK_TYPE_MAGIC     = 5,
+    DECK_TYPE_NEBULA    = 6,
+    DECK_TYPE_GHOST     = 7,
+    DECK_TYPE_ABANDONED = 8,
+    DECK_TYPE_CHECKERED = 9,
+    DECK_TYPE_ZODIAC    = 10,
+    DECK_TYPE_PAINTED   = 11,
+    DECK_TYPE_ANAGLYPH  = 12,
+    DECK_TYPE_PLASMA    = 13,
+    DECK_TYPE_ERRATIC   = 14,
+};
+extern const char *g_deck_type_names[DECK_TYPE_COUNT];
+
+#define STAKE_TYPE_COUNT 4
+enum
+{
+    STAKE_TYPE_WHITE = 0,
+    STAKE_TYPE_RED   = 1,
+    STAKE_TYPE_BLUE  = 2,
+    STAKE_TYPE_BLACK = 3,
+};
+extern const char *g_stake_type_names[STAKE_TYPE_COUNT];
+
+/* Blind-score multiplier per stake (index = STAKE_TYPE_*) */
+
+extern const float g_stake_blind_score_mults[STAKE_TYPE_COUNT];
+/* Shop/price multiplier per stake */
+extern const float g_stake_price_mults[STAKE_TYPE_COUNT];
+
+/* Seed char pool: A–N, P–Z, 1–9 — 34 chars; excludes O and 0 (matching Lua random_string) */
+#define SEED_CHAR_COUNT 34
+const char g_seed_alphabet[SEED_CHAR_COUNT + 1] =
+    "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
 
 #define GAME_SUBSTAGE_BLINDS_DEFAULT        0
 
@@ -731,6 +778,8 @@ struct GameState
         INPUT_FOCUSED_ZONE_MENU_TITLE     ,
         INPUT_FOCUSED_ZONE_MENU_MAIN      ,
         INPUT_FOCUSED_ZONE_MENU_OPTIONS   ,
+        INPUT_FOCUSED_ZONE_MENU_SETUP     ,
+        INPUT_FOCUSED_ZONE_MENU_COLLECTION ,
     } input_focused_zone, previous_input_focused_zone;
 
     // ingame

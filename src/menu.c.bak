@@ -24,27 +24,15 @@ static const char *s_main_menu_labels[MENU_MAIN_ITEM_COUNT] = {
     "COLLECTION"
 };
 
-/* Run-setup state — must appear before menu_activate_main_item */
-static int s_setup_selected_item = 0;        /* 0=card_type, 1=seed, 2=stake, 3=start */
-static int s_setup_card_type     = 0;
-static int s_setup_stake_type    = 0;
-static int s_setup_seed_char     = 0;        /* 0..7 cursor in seed buffer */
-static int s_setup_deck_page     = 0;        /* 0 = decks 0-7, 1 = decks 8-14 */
-static int s_options_page        = 0;        /* paginated options rows          */
-static int s_collection_selected_item = 0;   /* 0=Jokers 1=Tarots 2=Planets 3=Boosters 4=Back */
-
 static void menu_activate_main_item()
 {
     switch (g_game_state.menu_selected_item)
     {
         case MENU_MAIN_ITEM_NEW_RUN:
-            s_setup_selected_item  = 0;
-            s_setup_card_type      = g_settings.deck_type;
-            s_setup_stake_type     = g_settings.stake;
-            s_setup_seed_char      = 0;
-            s_setup_deck_page      = 0;
-            g_game_state.sub_stage         = GAME_SUBSTAGE_MENU_SETUP;
-            g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_SETUP;
+            if (g_init_resources_ok)
+            {
+                game_begin_new_run();
+            }
             break;
         case MENU_MAIN_ITEM_OPTIONS:
             g_game_state.menu_selected_item = 0;
@@ -55,9 +43,10 @@ static void menu_activate_main_item()
             sceKernelExitGame();
             break;
         case MENU_MAIN_ITEM_COLLECTION:
-            g_game_state.sub_stage         = GAME_SUBSTAGE_MENU_COLLECTION;
-            g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_COLLECTION;
-            s_collection_selected_item     = 0;
+            // Placeholder route for upcoming collection screen work.
+            g_game_state.menu_selected_item = 0;
+            g_game_state.sub_stage = GAME_SUBSTAGE_MENU_OPTIONS;
+            g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_OPTIONS;
             break;
     }
 }
@@ -74,29 +63,6 @@ static int s_social_discord_icon_texture = -1;
 static int s_social_x_icon_texture = -1;
 static int s_action_button_textures[MENU_MAIN_ITEM_COUNT] = { -1, -1, -1, -1 };
 static int s_missing_ui_asset_count = 0;
-
-/* Feature defines — placed before any function that uses them */
-#define SETUP_PAGE_SIZE              8
-#define MENU_OPTIONS_VISIBLE_ROWS    7
-#define MENU_OPTIONS_ITEM_OVERCLOCK      0
-#define MENU_OPTIONS_ITEM_AUDIO          1
-#define MENU_OPTIONS_ITEM_THEME          2
-#define MENU_OPTIONS_ITEM_LANGUAGE       3
-#define MENU_OPTIONS_ITEM_HAND_SIZE      4
-#define MENU_OPTIONS_ITEM_DISCARDS       5
-#define MENU_OPTIONS_ITEM_JOKER_SLOTS    6
-#define MENU_OPTIONS_ITEM_CONSUMABLE_SLOTS 7
-#define MENU_OPTIONS_ITEM_START_RUN      8
-#define MENU_OPTIONS_ITEM_BACK           9
-#define MENU_OPTIONS_ITEM_COUNT         10
-#define MENU_COLLECTION_ITEM_JOKERS      0
-#define MENU_COLLECTION_ITEM_TAROTS      1
-#define MENU_COLLECTION_ITEM_PLANETS     2
-#define MENU_COLLECTION_ITEM_BOOSTERS    3
-#define MENU_COLLECTION_ITEM_BACK        4
-#define MENU_COLLECTION_ITEM_COUNT       5
-#define MENU_OPTIONS_MODAL_NONE          0
-#define MENU_OPTIONS_MODAL_LANGUAGE      1
 
 #define MENU_WALLPAPER_VARIANT_COUNT 2
 static int s_title_wallpaper_textures[MENU_WALLPAPER_VARIANT_COUNT] = { -1, -1 };
@@ -241,6 +207,12 @@ static void menu_apply_active_variant_assets()
 
     s_title_logo_texture = s_title_logo_textures[s_wallpaper_variant];
 }
+
+/* --- Run-setup state --- */
+static int s_setup_selected_item = 0;        /* 0=card_type, 1=seed, 2=stake, 3=start */
+static int s_setup_card_type     = 0;
+static int s_setup_stake_type    = 0;
+static int s_setup_seed_char     = 0;        /* 0..7 cursor in seed buffer */
 
 // ----------------------------------------------------------------
 // Draw helpers
@@ -743,34 +715,29 @@ static void menu_draw_main()
 // ----------------------------------------------------------------
 static void menu_draw_options()
 {
-    menu_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x90000000);
-    const float mw = (float)(SCREEN_WIDTH * 72 / 100);
-    const float mx = (SCREEN_WIDTH - mw) * 0.5f;
-    const float my = 18.0f;
-    const float ih = 22.0f;
-    const int   first_r = s_options_page * MENU_OPTIONS_VISIBLE_ROWS;
-    const int   last_r = CLAMP(first_r + MENU_OPTIONS_VISIBLE_ROWS, 0, MENU_OPTIONS_ITEM_COUNT);
-    const int   rows_n = last_r - first_r;
-    const float hh = 26.0f;
-    const float ph = hh + rows_n * ih;
-    menu_draw_rect(mx, my, mw, ph, 0xFF1A1A1A);
-    menu_draw_rect_border(mx, my, mw, ph, 0xFF006D96, 2);
-    menu_draw_rect(mx, my, mw, hh, 0xFF2A2A2A);
-    menu_draw_rect_border(mx, my, mw, hh, 0xFF006D96, 1);
-    graphics_draw_text_center(font_small, "Options",
-        mx + mw * 0.5f, my + 7, 1.0f, 0xFFC8AA6E);
-    {
-        int tot = (MENU_OPTIONS_ITEM_COUNT + MENU_OPTIONS_VISIBLE_ROWS - 1) /
-                  MENU_OPTIONS_VISIBLE_ROWS;
-        for (int p = 0; p < tot; p++) {
-            float dc = mx + mw * (0.5f + (p - (tot-1)*0.5f) * 0.12f);
-            menu_draw_rect(dc-2.5f, my+9, 5, 5,
-                p==s_options_page ? 0xFFC8AA6E : 0xFF555555);
-        }
-    }
-    /* option values */
+    // Dark background
+    menu_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF0F0F0F);
+
+    // Top decorative stripe
+    menu_draw_rect(0, 0, SCREEN_WIDTH, 6, 0xFFC8AA6E);
+    menu_draw_rect(0, 6, SCREEN_WIDTH, 1, 0xFF7A6F42);
+
+    // Title banner
+    menu_draw_rect(0, 12, SCREEN_WIDTH, 35, 0xFF1A1A1A);
+    menu_draw_rect_border(0, 12, SCREEN_WIDTH, 35, 0xFF006D96, 1);
+    graphics_draw_text_center(font_big, "Run Setup", SCREEN_WIDTH / 2.0f, 25.0f, 1.8f, 0xFFC8AA6E);
 
     {
+        float panel_x = 60.0f;
+        float panel_y = 65.0f;
+        float panel_w = SCREEN_WIDTH - 120.0f;
+        float item_h  = 28.0f;
+        float panel_h = MENU_OPTIONS_ITEM_COUNT * item_h + 16.0f;
+
+        // Panel with border
+        menu_draw_rect(panel_x, panel_y, panel_w, panel_h, 0xFF1A1A1A);
+        menu_draw_rect_border(panel_x, panel_y, panel_w, panel_h, 0xFF006D96, 2);
+
         const char *overclock_val  = g_settings.overclock         ? "ON" : "OFF";
         const char *audio_val      = g_settings.audio             ? "ON" : "OFF";
         const char *theme_val      = (s_wallpaper_variant == 0)   ? "Classic" : "Alt";
@@ -791,26 +758,35 @@ static void menu_draw_options()
         snprintf(option_labels[MENU_OPTIONS_ITEM_START_RUN],  sizeof(option_labels[8]), "->  Start run  <-");
         snprintf(option_labels[MENU_OPTIONS_ITEM_BACK],       sizeof(option_labels[9]), "Back");
 
-        for (int ri = first_r; ri < first_r + rows_n; ri++) {
-            float item_y = my + hh + (ri - first_r) * ih;
-            float lx = mx + 14;
-            float lw = mw - 28;
-            bool sel = (ri == g_game_state.menu_selected_item);
-            if (sel) {
-                menu_draw_rect(lx, item_y, lw, ih - 1, 0xFF1F4F5F);
-                menu_draw_rect_border(lx, item_y, lw, ih - 1, 0xFFC8AA6E, 1);
-                graphics_draw_text(font_small, option_labels[ri], lx + 4, item_y + 4, 0.95f, 0xFFC8AA6E);
-            } else {
-                graphics_draw_text(font_small, option_labels[ri], lx + 4, item_y + 4, 0.95f,
-                    (ri==MENU_OPTIONS_ITEM_START_RUN)?0xFF90C060:0xFFDDDDDD);
+        for (int i = 0; i < MENU_OPTIONS_ITEM_COUNT; i++)
+        {
+            float item_y = panel_y + 8.0f + i * item_h;
+            float item_w = panel_w - 16.0f;
+
+            if (i == g_game_state.menu_selected_item)
+            {
+                menu_draw_rect(panel_x + 8, item_y, item_w, item_h - 4, 0xFF1F4F5F);
+                menu_draw_rect_border(panel_x + 8, item_y, item_w, item_h - 4, 0xFFC8AA6E, 1);
+                graphics_draw_text(font_small, option_labels[i], panel_x + 18.0f, item_y + 7.0f, 1.1f, 0xFFC8AA6E);
+            }
+            else
+            {
+                graphics_draw_text(font_small, option_labels[i], panel_x + 18.0f, item_y + 7.0f, 1.1f,
+                                   (i == MENU_OPTIONS_ITEM_START_RUN) ? 0xFF90C060 : 0xFFBBBBBB);
+            }
+
+            if (i < MENU_OPTIONS_ITEM_COUNT - 1)
+            {
+                menu_draw_line_h(panel_x + 8, item_y + item_h - 1, item_w, 0xFF333333);
             }
         }
     }
 
+    // Control hints at bottom
     float hint_y = SCREEN_HEIGHT - 28.0f;
     menu_draw_separator(30, hint_y, SCREEN_WIDTH - 60, 0xFF006D96);
     graphics_draw_text_center(font_small,
-        "[Up/Down] Page   [L/R] Flip   [X] Select  \xe2\x97\x8f Close",
+        "[Up/Down] Navigate   [X] Select/Start   [O] Back",
         SCREEN_WIDTH / 2.0f, hint_y + 12.0f, 0.9f, 0xFF888888);
 
     if (s_options_modal == MENU_OPTIONS_MODAL_LANGUAGE)
@@ -852,7 +828,6 @@ static void menu_draw_options()
 // Top-level menu draw dispatcher
 // ----------------------------------------------------------------
 void menu_draw_setup(void);
-void menu_draw_collection(void);
 void menu_draw()
 {
     if (g_game_state.sub_stage == GAME_SUBSTAGE_MENU_MAIN ||
@@ -890,14 +865,7 @@ void menu_draw()
             menu_draw_options();
             break;
         case GAME_SUBSTAGE_MENU_SETUP:
-            if (s_setup_selected_item < 0 || s_setup_selected_item >= MENU_SETUP_ITEM_COUNT)
-                s_setup_selected_item = 0;
             menu_draw_setup();
-            break;
-        case GAME_SUBSTAGE_MENU_COLLECTION:
-            if (s_collection_selected_item < 0 || s_collection_selected_item >= MENU_COLLECTION_ITEM_COUNT)
-                s_collection_selected_item = 0;
-            menu_draw_collection();
             break;
         default:
             menu_draw_title();
@@ -1179,20 +1147,13 @@ void menu_input_setup(bool no_input)
         {
             case MENU_SETUP_ITEM_CARD_TYPE:
             {
-                if (input_was_button_pressed(INPUT_BUTTON_LEFT)) {
-                    s_setup_deck_page = CLAMP(s_setup_deck_page - 1, 0,
-                        (DECK_TYPE_COUNT + SETUP_PAGE_SIZE - 1) / SETUP_PAGE_SIZE - 1);
-                    s_setup_card_type = s_setup_deck_page * SETUP_PAGE_SIZE;
-                } else if (input_was_button_pressed(INPUT_BUTTON_RIGHT)) {
-                    s_setup_deck_page = CLAMP(s_setup_deck_page + 1, 0,
-                        (DECK_TYPE_COUNT + SETUP_PAGE_SIZE - 1) / SETUP_PAGE_SIZE - 1);
-                    s_setup_card_type = s_setup_deck_page * SETUP_PAGE_SIZE;
-                } else if (input_was_button_pressed(INPUT_BUTTON_CROSS)) {
-                    s_setup_card_type += 1;
-                    while (s_setup_card_type < 0) s_setup_card_type += DECK_TYPE_COUNT;
-                    s_setup_card_type %= DECK_TYPE_COUNT;
-                    s_setup_deck_page = s_setup_card_type / SETUP_PAGE_SIZE;
-                }
+                int step = input_was_button_pressed(INPUT_BUTTON_RIGHT) ? 1
+                           : input_was_button_pressed(INPUT_BUTTON_LEFT) ? -1
+                           : 0;
+                if (step == 0) step = 1;
+                s_setup_card_type += step;
+                while (s_setup_card_type < 0) s_setup_card_type += DECK_TYPE_COUNT;
+                s_setup_card_type %= DECK_TYPE_COUNT;
                 break;
             }
             case MENU_SETUP_ITEM_SEED:
@@ -1257,98 +1218,5 @@ void menu_input_setup(bool no_input)
         g_game_state.menu_selected_item = MENU_MAIN_ITEM_NEW_RUN;
         g_game_state.sub_stage = GAME_SUBSTAGE_MENU_MAIN;
         g_game_state.input_focused_zone = INPUT_FOCUSED_ZONE_MENU_MAIN;
-    }
-}
-
-
-// ----------------------------------------------------------------
-// Draw: collection screen (card-catalogue overview)
-// ----------------------------------------------------------------
-void menu_draw_collection()
-{
-    menu_draw_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0xFF0F0F0F);
-    menu_draw_rect(0, 0, SCREEN_WIDTH, 6, 0xFFC8AA6E);
-    menu_draw_rect(0, 6, SCREEN_WIDTH, 1, 0xFF7A6F42);
-    menu_draw_rect(0, 12, SCREEN_WIDTH, 36, 0xFF1A1A1A);
-    menu_draw_rect_border(0, 12, SCREEN_WIDTH, 36, 0xFF006D96, 1);
-    graphics_draw_text_center(font_big, "Collection",
-        SCREEN_WIDTH / 2.0f, 24.0f, 1.8f, 0xFFC8AA6E);
-
-    static const char *s_t[MENU_COLLECTION_ITEM_COUNT] = {
-        "Jokers", "Tarots", "Planets", "Boosters", "Back"
-    };
-    const float th  = 44.0f;
-    const float gap = 12.0f;
-    const float ry1 = 62.0f;
-    const float ry2 = ry1 + th + gap;
-    const int   sel = s_collection_selected_item;
-    const float totw = SCREEN_WIDTH * 0.88f;
-    const float tw   = (totw - gap) * 0.5f;
-    const float rx   = (SCREEN_WIDTH - totw) * 0.5f;
-
-    for (int R = 0; R < 2; R++) {
-        const int items[2] = {0, 1};
-        float ry = R == 0 ? ry1 : ry2;
-        for (int i2 = 0; i2 < 2; i2++) {
-            int it = R == 0 ? items[i2] : (i2 == 0 ? 2 : 3);
-            float tx = rx + i2 * (tw + gap);
-            bool si = (it == sel);
-            menu_draw_rect(tx, ry, tw, th, si ? 0xFF1F4F5F : 0xFF2A2A2A);
-            menu_draw_rect_border(tx, ry, tw, th,
-                si ? 0xFFC8AA6E : 0xFF4B79BF, 1);
-            graphics_draw_text_center(font_small, s_t[it],
-                tx + tw * 0.5f, ry + th * 0.5f - 4, 1.0f,
-                si ? 0xFFC8AA6E : 0xFFDDDDDD);
-        }
-    }
-
-    /* BACK button */
-    {
-        float bw = 120, bh = 28;
-        float bx = (SCREEN_WIDTH - bw) * 0.5f;
-        float by = ry2 + th + 8;
-        bool sb = (sel == MENU_COLLECTION_ITEM_BACK);
-        menu_draw_rect(bx, by, bw, bh, sb ? 0xFF3A3A3A : 0xFF2A2A2A);
-        menu_draw_rect_border(bx, by, bw, bh, sb ? 0xFFFFFFFF : 0xFF888888, 1);
-        graphics_draw_text_center(font_small, "BACK",
-            bx + bw * 0.5f, by + bh * 0.5f - 4, 1.0f,
-            sb ? 0xFFFFFFFF : 0xFFDDDDDD);
-    }
-
-    float hy = SCREEN_HEIGHT - 28.0f;
-    menu_draw_separator(30, hy, SCREEN_WIDTH - 60, 0xFF006D96);
-    graphics_draw_text_center(font_small,
-        "[Left/Right] Nav  |  [X] View  |  [O] Back to Menu",
-        SCREEN_WIDTH / 2.0f, hy + 12, 0.9f, 0xFF888888);
-}
-
-// ----------------------------------------------------------------
-// Input: collection screen
-// ----------------------------------------------------------------
-void menu_input_collection(bool no_input)
-{
-    if (no_input) return;
-
-    if (input_was_button_pressed(INPUT_BUTTON_CIRCLE)) {
-        g_game_state.menu_selected_item  = MENU_MAIN_ITEM_COLLECTION;
-        g_game_state.sub_stage           = GAME_SUBSTAGE_MENU_MAIN;
-        g_game_state.input_focused_zone  = INPUT_FOCUSED_ZONE_MENU_MAIN;
-        return;
-    }
-
-    int dir = 0;
-    if (input_was_button_pressed(INPUT_BUTTON_LEFT)   ||
-        input_was_button_pressed(INPUT_BUTTON_UP))
-        dir = -1;
-    else if (input_was_button_pressed(INPUT_BUTTON_RIGHT) ||
-             input_was_button_pressed(INPUT_BUTTON_DOWN))
-        dir = +1;
-
-    if (dir != 0) {
-        s_collection_selected_item += dir;
-        if (s_collection_selected_item < 0)
-            s_collection_selected_item = MENU_COLLECTION_ITEM_COUNT - 1;
-        if (s_collection_selected_item >= MENU_COLLECTION_ITEM_COUNT)
-            s_collection_selected_item = 0;
     }
 }
